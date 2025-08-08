@@ -77,17 +77,34 @@ echo -e "\nDefault Prompt:\n\"${default_prompt}\"\n"
 read -p "> " user_prompt
 user_prompt=${user_prompt:-$default_prompt}
 
-# Collect solved GitHub issues in a loop
-echo "------------------------------"
-echo "Do you have any solved GitHub issues to include?"
-solved_issues=() # Initialize an empty array to store issues
-while true; do
-    read -p "Enter a solved issue (e.g., 'fix login bug #123'), or press Enter to finish: " issue_input
-    if [[ -z "$issue_input" ]]; then
-        break # Exit loop if user presses Enter
-    fi
-    solved_issues+=("$issue_input") # Add the issue to our array
-done
+# --- Step 3.1: Fetch GitHub issues and let the user select ---
+echo "---"
+echo "🔍 Fetching open issues from GitHub..."
+
+# Ensure gh or curl + jq are available
+if command -v gh &>/dev/null; then
+    issues_list=$(gh issue list --limit 50 --json number,title --jq '.[] | "\(.number) | \(.title)"')
+else
+    repo_url=$(git config --get remote.origin.url | sed -E 's#(git@|https://)github.com[:/]##; s/.git$//')
+    issues_list=$(curl -s "https://api.github.com/repos/${repo_url}/issues?state=open&per_page=50" \
+        | jq -r '.[] | "\(.number) | \(.title)"')
+fi
+
+if [[ -z "$issues_list" ]]; then
+    echo "⚠️  No open issues found."
+    solved_issues=()
+else
+    echo "✅ Select related issues (space to toggle, enter to confirm):"
+    selected=$(echo "$issues_list" | fzf --multi --bind "space:toggle" --prompt="Select issues: ")
+    
+    solved_issues=()
+    while IFS= read -r line; do
+        issue_number=$(echo "$line" | awk '{print $1}')
+        issue_title=$(echo "$line" | cut -d'|' -f2- | sed 's/^ *//')
+        solved_issues+=("${issue_title} #${issue_number}")
+    done <<< "$selected"
+fi
+
 
 
 # --- Step 4 & 5: Send to Gemini API and output response ---
