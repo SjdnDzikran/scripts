@@ -165,3 +165,18 @@ echo "✨ Here is the suggested PR Title and Description:"
 echo "------------------------------"
 echo "$generated_text"
 echo "------------------------------"
+
+# --- Step 6: Automatically create PR (optional) ---
+read -p "Do you want to create a GitHub PR with this? (y/N): " create_pr
+if [[ "$create_pr" =~ ^[Yy]$ ]]; then
+    # Extract PR title
+    pr_title=$(echo "$generated_text" | sed -n '/\*\*PR Title:/,/PR Description:/p' \
+        | grep -E '^`.*`$' \
+        | sed 's/^`//;s/`$//')
+
+    # Extract PR body (everything after "PR Description:")
+    pr_body=$(echo "$generated_text" | awk '/\*\*PR Description:/{flag=1; next} flag {print}')
+
+    echo "📤 Creating PR: \"$pr_title\"..."
+    gh pr create --base "$to_branch" --head "$from_branch" --title "$pr_title" --body "$pr_body"
+fi
