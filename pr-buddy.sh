@@ -1,4 +1,6 @@
-# pr-buddy.sh: A script to generate a PR title and description using Gemini (gemini-2.5-pro),
+#!/usr/bin/env bash
+
+# pr-buddy.sh: A script to generate a PR title and description using Gemini,
 # with context from code diffs and linked GitHub issues.
 
 # --- Configuration ---
@@ -31,19 +33,21 @@ if ! git rev-parse --is-inside-work-tree &> /dev/null; then
 fi
 
 echo "✅ Pre-flight checks passed."
-echo "---"
+echo "------------------------------"
 
 
 # --- Step 1: Get branch names from the user ---
 
 current_branch=$(git rev-parse --abbrev-ref HEAD)
+default_branch=$(git remote show origin | awk '/HEAD branch/ {print $NF}')
+
 read -p "Enter the source branch (from) [default: ${current_branch}]: " from_branch
 from_branch=${from_branch:-$current_branch}
 
-read -p "Enter the target branch (to) [default: main]: " to_branch
-to_branch=${to_branch:-main}
+read -p "Enter the target branch (to) [default: ${default_branch}]: " to_branch
+to_branch=${to_branch:-$default_branch}
 
-echo "---"
+echo "------------------------------"
 echo "➡️  Comparing branches: ${from_branch} -> ${to_branch}"
 
 
@@ -60,23 +64,21 @@ if [[ -z "$diff_output" ]]; then
 fi
 
 echo "✅  Found code differences."
-echo "---"
+echo "------------------------------"
 
 
 # --- Step 3: Get the user's prompt and solved issues ---
 
-### MODIFIED ###
 # Updated default prompt to ask the model to consider GitHub issues.
-default_prompt="Generate a concise PR title and a detailed description in markdown format. The title should be prefixed with a conventional commit type (e.g., feat, fix, docs). The description should first state which issues it resolves, then include a '## Summary' section and a '## Changes' section with a bulleted list of key modifications based on the code diff."
+default_prompt=$'Based on the code diff, help me write a PR title and a purely technical description.\n\n**Instructions:**\n\n1.  **PR Title (Conventional Commit Format):**\n    *   **Format:** `type(scope): subject`\n    *   **`type`:** Choose from `feat`, `fix`, `chore`, `refactor`, `style`, `ci`, `docs`.\n    *   **`scope` (optional):** A noun for the codebase section (e.g., `api`, `camera`, `ui`, `auth`, `build`).\n    *   **`subject`:** A short, imperative-mood summary of the change.\n    *   **Example:** `feat(camera): Add continuous torch mode`\n\n2.  **PR Description (Technical Only):**\n    *   Write a description containing **only technical implementation details**.\n    *   The entire description must be formatted within a **single markdown code block**.\n\n---\n\n**Description Formatting Rules:**\n\n*   **No Introduction:** The description must start **directly** with the first relevant category heading. Do not add any introductory sentences.\n\n*   **Category Headings:** Group technical changes into the following categories using `##` (H2) headings. Only include categories that have relevant changes.\n    *   `### ✨ New Functionality`\n    *   `### 🛠️ Refactoring & Architectural Changes`\n    *   `### 🐛 Bug Fixes`\n    *   `### ⚡ Performance Improvements`\n    *   `### 🧹 Maintenance & Chores`\n\n*   **Technical Bullet Points:** Under each category, list the changes as concise, technical bullet points. Focus on the \"how\" and \"what\" of the code changes (e.g., \"Refactored `UserService` to use dependency injection,\" \"Replaced `Promise.all` with `for...of` loop to handle rate limiting\").\n\n*   **Issue Linking:** For each bullet point that resolves a GitHub issue, append `Fixes #{issue_number}` or `Closes #{issue_number}` at the **end of that specific bullet point\'s line.**\n\n---\n\n**GitHub Issues to close with this PR:**'
 
 echo "Enter your prompt for Gemini. Press Enter to use the default:"
 echo -e "\nDefault Prompt:\n\"${default_prompt}\"\n"
 read -p "> " user_prompt
 user_prompt=${user_prompt:-$default_prompt}
 
-### NEW ###
 # Collect solved GitHub issues in a loop
-echo "---"
+echo "------------------------------"
 echo "Do you have any solved GitHub issues to include?"
 solved_issues=() # Initialize an empty array to store issues
 while true; do
@@ -90,7 +92,7 @@ done
 
 # --- Step 4 & 5: Send to Gemini API and output response ---
 
-echo "---"
+echo "------------------------------"
 echo "🤖  Sending prompt, issues, and diff to Gemini. Please wait..."
 
 ### NEW ###
@@ -141,8 +143,8 @@ fi
 
 generated_text=$(echo "$api_response" | jq -r '.candidates[0].content.parts[0].text')
 
-echo "---"
+echo "------------------------------"
 echo "✨ Here is the suggested PR Title and Description:"
-echo "---"
+echo "------------------------------"
 echo "$generated_text"
-echo "---"
+echo "------------------------------"
