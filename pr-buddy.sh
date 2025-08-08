@@ -175,7 +175,7 @@ if [[ "$create_pr" =~ ^[Yy]$ ]]; then
         | sed 's/^`//;s/`$//')
 
     # Extract PR body (everything after "PR Description:")
-    pr_body=$(echo "$generated_text" | awk '/\*\*PR Description:/{flag=1; next} flag {print}')
+    pr_body=$(echo "$ai_response" | sed -n '/^```markdown$/,/^```$/p' | sed '1d;$d')
 
     echo "📤 Creating PR: \"$pr_title\"..."
     gh pr create --base "$to_branch" --head "$from_branch" --title "$pr_title" --body "$pr_body"
