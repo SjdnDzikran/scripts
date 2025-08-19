@@ -167,21 +167,29 @@ EOF
 )
 
 # MODIFIED: Tell the API we want a JSON response for better model adherence
+tmpfile=$(mktemp)
+printf '%s' "$full_prompt_text" > "$tmpfile"
+
 json_payload=$(
-    jq -n \
-        --arg text "$full_prompt_text" \
-        '{
-      "contents": [{"parts": [{"text": $text}]}],
-      "generationConfig": {
-        "responseMimeType": "application/json"
-      }
-    }'
+    jq -n --rawfile text "$tmpfile" \
+        '{ 
+          contents: [ { parts: [ { text: $text } ] } ],
+          generationConfig: { responseMimeType: "application/json" }
+        }'
 )
+rm "$tmpfile"
 
 # Using gemini-2.5-pro as it's fast and great for structured output
 API_URL="https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent?key=${GEMINI_API_KEY}"
 
-api_response=$(curl -s -H "Content-Type: application/json" -d "$json_payload" "$API_URL")
+payload_file=$(mktemp)
+printf '%s' "$json_payload" > "$payload_file"
+
+api_response=$(
+    curl -s -H "Content-Type: application/json" -d @"$payload_file" "$API_URL"
+)
+
+rm "$payload_file"
 
 if echo "$api_response" | jq -e '.error' >/dev/null; then
     echo "❌ Error received from Gemini API:"
