@@ -224,15 +224,15 @@ echo -e "\n---------------------------"
 
 
 # --- Step 6: Automatically create PR (optional) ---
-read -p "Do you want to create a GitHub PR with this? (y/N): " create_pr
-if [[ "${create_pr}" =~ ^[Yy]$ ]]; then
+read -p "Do you want to create a GitHub PR with this? (Y/n): " create_pr
+if [[ ! "${create_pr}" =~ ^[Nn]$ ]]; then
     if ! command -v gh &>/dev/null; then
         echo "Error: 'gh' command is not installed. Cannot create PR."
         echo "Please install the GitHub CLI: https://cli.github.com/"
         exit 1
     fi
     echo "📤 Creating PR: \"$pr_title\"..."
-    # MODIFIED: The variables are already clean and ready to use
+    # The variables are already clean and ready to use
     gh pr create --base "$to_branch" --head "$from_branch" --title "$pr_title" --body "$pr_body"
 fi
 
