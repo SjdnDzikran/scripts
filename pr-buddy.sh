@@ -97,7 +97,7 @@ The JSON object must have the following structure:
     *   Under each category, list each major change using the following nested structure:
         *   Start with a primary bullet point (`*`). The line must begin with a **bolded, descriptive title** that summarizes the change, followed by a colon.
         *   Immediately after the colon, write a detailed paragraph explaining the change, its impact, and the technical reasoning.
-        *   On a new line, add a nested and **bolded** bullet point that contains only the issue reference.
+        *   On a new line, add a nested and **bolded** bullet point that contains only the issue reference. Crucially, each issue must be on its own separate line and in its own bullet point to ensure GitHub can parse them correctly.
     *   **Example of the required format for a single item:**
         ```markdown
         *   **Sequential Image Processing:** The multi-shot camera has been re-architected to process images sequentially rather than in parallel. This significantly reduces memory pressure and resolves crashes that occurred when capturing a large number of photos (15+) in a single session.
