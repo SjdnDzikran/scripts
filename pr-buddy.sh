@@ -284,7 +284,12 @@ if [[ ! "${create_pr}" =~ ^[Nn]$ ]]; then
     fi
     echo "📤 Creating PR: \"$pr_title\"..."
     # The variables are already clean and ready to use
-    gh pr create --base "$to_branch" --head "$from_branch" --title "$pr_title" --body "$pr_body"
+    gh pr create \
+      --base "$to_branch" \
+      --head "$from_branch" \
+      --title "$pr_title" \
+      --body "$pr_body" \
+      --assignee "$(gh api user --jq '.login')"
 fi
 
 echo "✅ Done."
