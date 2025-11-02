@@ -8,8 +8,10 @@ import os
 import sys
 import subprocess
 import json
-import requests
 import shutil
+from typing import List, Dict, Any
+
+import requests
 
 # --- Configuration ---
 REQUIRED_CMDS = ["git", "curl", "jq", "fzf"]
@@ -158,30 +160,67 @@ print("🔍 Fetching open issues from GitHub...")
 repo_url = run("git config --get remote.origin.url")
 repo_slug = repo_url.replace("git@github.com:", "").replace("https://github.com/", "").replace(".git", "")
 
+issues_json: List[Dict[str, Any]] = []
 issues_list = ""
 if shutil.which("gh"):
-    issues_list = run(f'gh issue list --limit 50 --json number,title --jq \'.[] | "#\\(.number) | \\(.title)"\'')
+    gh_output = run("gh issue list --limit 50 --json number,title,labels")
+    if gh_output:
+        try:
+            issues_json = json.loads(gh_output)
+        except json.JSONDecodeError as exc:
+            error(f"Unable to parse GitHub CLI issue output: {exc}")
 else:
     resp = requests.get(
         f"https://api.github.com/repos/{repo_slug}/issues?state=open&per_page=50",
         headers={"Accept": "application/vnd.github.v3+json"},
     )
     if resp.ok:
-        issues_list = "\n".join([f"#{i['number']} | {i['title']}" for i in resp.json()])
+        issues_json = resp.json()
+
+if issues_json:
+    issues_list = "\n".join([f"#{issue['number']} | {issue['title']}" for issue in issues_json])
 
 solved_issues = []
+pr_labels: List[str] = []
+label_seen = set()
 if not issues_list.strip():
     print("⚠️  No open issues found.")
 else:
     print("✅ Select related issues (space to toggle, enter to confirm):")
-    selected = run("fzf --multi --bind 'space:toggle' --prompt='Select issues: '", capture=True, check=False).splitlines()
-    for line in selected:
+    fzf_proc = subprocess.run(
+        "fzf --multi --bind 'space:toggle' --prompt='Select issues: '",
+        input=issues_list,
+        text=True,
+        capture_output=True,
+        shell=True,
+    )
+
+    selected_lines = []
+    if fzf_proc.returncode == 0 and fzf_proc.stdout:
+        selected_lines = [line for line in fzf_proc.stdout.splitlines() if line.strip()]
+
+    for line in selected_lines:
         if "|" in line:
             num_part, title_part = line.split("|", 1)
             issue_number = num_part.strip().lstrip("#")
             issue_title = title_part.strip()
             if issue_number and issue_title:
                 solved_issues.append(f"- {issue_title} #{issue_number}")
+
+                try:
+                    issue_num_int = int(issue_number)
+                except ValueError:
+                    continue
+
+                issue_data = next((item for item in issues_json if item.get("number") == issue_num_int), None)
+                if not issue_data:
+                    continue
+
+                for label in issue_data.get("labels", []):
+                    label_name = label.get("name") if isinstance(label, dict) else label
+                    if label_name and label_name not in label_seen:
+                        label_seen.add(label_name)
+                        pr_labels.append(label_name)
 
 
 # --- Step 4: Send to Gemini ---
@@ -231,6 +270,29 @@ if confirm("Do you want to create a GitHub PR with this?"):
     if not shutil.which("gh"):
         error("'gh' CLI is not installed. Cannot create PR.")
     print(f"📤 Creating PR: \"{pr_title}\"...")
-    run(f'gh pr create --base "{to_branch}" --head "{from_branch}" --title "{pr_title}" --body "{pr_body}"', capture=False)
+    assignee = run("gh api user --jq '.login'")
+
+    gh_pr_args: List[str] = [
+        "gh",
+        "pr",
+        "create",
+        "--base",
+        to_branch,
+        "--head",
+        from_branch,
+        "--title",
+        pr_title,
+        "--body",
+        pr_body,
+        "--assignee",
+        assignee,
+    ]
+
+    if pr_labels:
+        print(f"🏷️  Applying labels: {', '.join(pr_labels)}")
+        for label in pr_labels:
+            gh_pr_args.extend(["--label", label])
+
+    subprocess.run(gh_pr_args, check=True)
 
 print("✅ Done.")
