@@ -164,17 +164,25 @@ user_prompt=${user_prompt:-$default_prompt}
 # --- Step 3.1: Fetch GitHub issues and let the user select ---
 echo "🔍 Fetching open issues from GitHub..."
 repo_url=$(git config --get remote.origin.url | sed -E 's#(git@|https://)github.com[:/](.*)\.git#\2#')
+issues_json="[]"
 issues_list=""
 if command -v gh &>/dev/null; then
-    issues_list=$(gh issue list --limit 50 --json number,title --jq '.[] | "#\(.number) | \(.title)"')
+    issues_json=$(gh issue list --limit 50 --json number,title,labels)
 else
     # Fallback to curl if gh is not available
-    issues_list=$(curl -s -H "Accept: application/vnd.github.v3+json" \
-        "https://api.github.com/repos/${repo_url}/issues?state=open&per_page=50" |
-        jq -r '.[] | "#\(.number) | \(.title)"')
+    issues_json=$(curl -s -H "Accept: application/vnd.github.v3+json" \
+        "https://api.github.com/repos/${repo_url}/issues?state=open&per_page=50")
 fi
 
+if [[ -z "$issues_json" ]]; then
+    issues_json="[]"
+fi
+
+issues_list=$(echo "$issues_json" | jq -r '.[] | "#\(.number) | \(.title)"')
+
 solved_issues=()
+declare -a pr_labels=()
+declare -A label_seen=()
 if [[ -z "$issues_list" ]]; then
     echo "⚠️  No open issues found."
 else
@@ -193,6 +201,20 @@ else
         # Ensure we have valid data before adding to the array
         if [[ -n "$issue_number" && -n "$issue_title" ]]; then
             solved_issues+=("- ${issue_title} #${issue_number}")
+
+            if [[ "$issue_number" =~ ^[0-9]+$ ]]; then
+                labels_for_issue=$(
+                    echo "$issues_json" | jq -r --argjson num "$issue_number" '.[] | select(.number == $num) | .labels[]?.name'
+                )
+                if [[ -n "$labels_for_issue" ]]; then
+                    while IFS= read -r label_name; do
+                        if [[ -n "$label_name" && -z "${label_seen[$label_name]+_}" ]]; then
+                            label_seen["$label_name"]=1
+                            pr_labels+=("$label_name")
+                        fi
+                    done <<< "$labels_for_issue"
+                fi
+            fi
         fi
     done <<< "$selected"
 fi
@@ -287,13 +309,29 @@ if [[ ! "${create_pr}" =~ ^[Nn]$ ]]; then
         exit 1
     fi
     echo "📤 Creating PR: \"$pr_title\"..."
-    # The variables are already clean and ready to use
-    gh pr create \
-      --base "$to_branch" \
-      --head "$from_branch" \
-      --title "$pr_title" \
-      --body "$pr_body" \
-      --assignee "$(gh api user --jq '.login')"
+    assignee=$(gh api user --jq '.login')
+    gh_pr_args=(
+      --base "$to_branch"
+      --head "$from_branch"
+      --title "$pr_title"
+      --body "$pr_body"
+      --assignee "$assignee"
+    )
+
+    if [[ ${#pr_labels[@]} -gt 0 ]]; then
+        label_display=""
+        for label in "${pr_labels[@]}"; do
+            if [[ -z "$label_display" ]]; then
+                label_display="$label"
+            else
+                label_display+=", $label"
+            fi
+            gh_pr_args+=(--label "$label")
+        done
+        echo "🏷️  Applying labels: ${label_display}"
+    fi
+
+    gh pr create "${gh_pr_args[@]}"
 fi
 
 echo "✅ Done."
