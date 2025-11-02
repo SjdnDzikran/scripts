@@ -1,5 +1,11 @@
 # PR Buddy
 
+[![License](https://img.shields.io/github/license/SjdnDzikran/scripts)](LICENSE)
+[![Open Issues](https://img.shields.io/github/issues/SjdnDzikran/scripts)](https://github.com/SjdnDzikran/scripts/issues)
+[![Open PRs](https://img.shields.io/github/issues-pr/SjdnDzikran/scripts)](https://github.com/SjdnDzikran/scripts/pulls)
+[![Last Commit](https://img.shields.io/github/last-commit/SjdnDzikran/scripts/master)](https://github.com/SjdnDzikran/scripts/commits/master)
+[![Shell](https://img.shields.io/badge/shell-bash-4EAA25.svg)](https://www.gnu.org/software/bash/)
+
 A command-line helper that prepares high-quality pull request titles and descriptions using Gemini, grounded in your git diff and the GitHub issues you link. After previewing the generated content, PR Buddy can open the PR in GitHub with the right branches, assignee, and label set inherited from the referenced issues.
 
 ## Requirements
