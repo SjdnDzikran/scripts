@@ -105,8 +105,8 @@ The JSON object must have the following structure:
 2.  `description` (string):
     *   This string must contain the full technical description formatted in Markdown.
     *   Do not add any introductory sentences. Start directly with the first relevant category heading.
-    *   Group technical changes into the following categories using `###` (H3) headings. Only include categories with relevant changes.
-        * `### ✨ New Functionality`
+    *   Group technical changes into the following categories using `###` (H3) headings. Only include categories with relevant changes:
+        * `### ✨ New Feature`
         * `### 🛠️ Refactoring & Architectural Changes`
         * `### 🐛 Bug Fixes`
         * `### ⚡ Performance Improvements`
@@ -114,7 +114,19 @@ The JSON object must have the following structure:
     *   Under each category, list each major change using the following nested structure:
         *   Start with a primary bullet point (`*`). The line must begin with a **bolded, descriptive title** that summarizes the change, followed by a colon.
         *   Immediately after the colon, write a detailed paragraph explaining the change, its impact, and the technical reasoning.
-        *   On a new line, add a nested and **bolded** bullet point that contains only the issue reference. Each issue must be on its own line.
+        *   On a new line, add a nested and **bolded** bullet point that contains only the issue reference.
+    *   **Important Rules:**
+        *   Each issue number (e.g., `#26`) may only appear **once** in the entire PR description. If multiple changes relate to the same issue, merge them into a single bullet point that collectively describes all relevant changes for that issue.
+        *   Do **not** repeat the same issue reference under multiple bullet points or categories.
+        *   When merging related changes, clearly describe all technical updates under a unified description.
+    *   **Example of the required format for a single item:**
+        ```markdown
+        *   **Sequential Image Processing:** The multi-shot camera has been re-architected to process images sequentially rather than in parallel. This significantly reduces memory pressure and resolves crashes that occurred when capturing a large number of photos (15+) in a single session.
+            *   **Fixes #77**
+        ```
+
+---
+GitHub Issues to close with this PR:
 """
 
 default_prompt = r"""Based on the code diff and linked issues, generate a JSON object with a PR title and a technical PR description.
@@ -142,13 +154,16 @@ The JSON object must have the following structure:
     * This string must contain the full technical description formatted in Markdown.
     * Do not add any introductory sentences. Start directly with the first relevant category heading.
     * Group technical changes into the following categories using `###` (H3) headings. Only include categories with relevant changes.
-        * `### ✨ New Functionality`
+        * `### ✨ New Feature`
         * `### 🛠️ Refactoring & Architectural Changes`
         * `### 🐛 Bug Fixes`
         * `### ⚡ Performance Improvements`
         * `### 🧹 Maintenance & Chores`
     * Under each category, list changes as concise, technical bullet points.
     * For each bullet point that resolves a GitHub issue, append `Fixes #{issue_number}` or `Closes #{issue_number}` at the end of that bullet point's line.
+
+---
+GitHub Issues to close with this PR:
 """
 
 use_experimental = input("Do you want to use the experimental prompt? (Y/n): ").strip().lower()
