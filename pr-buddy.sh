@@ -89,7 +89,7 @@ The JSON object must have the following structure:
     *   This string must contain the full technical description formatted in Markdown.
     *   Do not add any introductory sentences. Start directly with the first relevant category heading.
     *   Group technical changes into the following categories using `###` (H3) headings. Only include categories with relevant changes:
-        * `### ✨ New Functionality`
+        * `### ✨ New Feature`
         * `### 🛠️ Refactoring & Architectural Changes`
         * `### 🐛 Bug Fixes`
         * `### ⚡ Performance Improvements`
@@ -146,7 +146,7 @@ The JSON object must have the following structure:
     * This string must contain the full technical description formatted in Markdown.
     * Do not add any introductory sentences. Start directly with the first relevant category heading.
     * Group technical changes into the following categories using `###` (H3) headings. Only include categories with relevant changes.
-        * `### ✨ New Functionality`
+        * `### ✨ New Feature`
         * `### 🛠️ Refactoring & Architectural Changes`
         * `### 🐛 Bug Fixes`
         * `### ⚡ Performance Improvements`
