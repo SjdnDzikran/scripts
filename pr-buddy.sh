@@ -331,14 +331,17 @@ if [[ ! "${create_pr}" =~ ^[Nn]$ ]]; then
         echo "🏷️  Applying labels: ${label_display}"
     fi
 
-    pr_data=$(gh pr create "${gh_pr_args[@]}" --json number,url)
+    pr_data=$(gh pr create "${gh_pr_args[@]}")
     if [[ -z "$pr_data" ]]; then
         echo "❌ Failed to create PR."
         exit 1
     fi
 
-    pr_number=$(echo "$pr_data" | jq -r '.number // empty' 2>/dev/null || echo "")
-    pr_url=$(echo "$pr_data" | jq -r '.url // empty' 2>/dev/null || echo "")
+    pr_url=$(echo "$pr_data" | awk 'NF' | tail -n1)
+    pr_number=""
+    if [[ "$pr_url" =~ /pull/([0-9]+) ]]; then
+        pr_number="${BASH_REMATCH[1]}"
+    fi
 
     if [[ -n "$pr_url" ]]; then
         echo "✅ PR created: ${pr_url}"
