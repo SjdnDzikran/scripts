@@ -9,6 +9,44 @@ set -e
 set -u
 set -o pipefail
 
+maybe_sync_default_branch() {
+    local repo_path target_branch remote_default
+    repo_path=$(pwd)
+
+    if [[ "$repo_path" == /mnt/* ]]; then
+        echo "⚠️ Skipping branch sync because repository path is under /mnt."
+        return
+    fi
+
+    remote_default=$(git remote show origin 2>/dev/null | awk '/HEAD branch/ {print $NF}')
+    if [[ -z "$remote_default" ]]; then
+        remote_default=$(git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's#.*/##')
+    fi
+    if [[ -z "$remote_default" ]]; then
+        echo "⚠️ Skipping branch sync: could not determine the default branch."
+        return
+    fi
+
+    target_branch="$remote_default"
+    echo "🔁 Switching to ${target_branch} (default branch) and pulling latest changes..."
+    if git switch "$target_branch" 2>/dev/null; then
+        :
+    elif git switch --track "origin/${target_branch}" 2>/dev/null; then
+        :
+    elif git checkout "$target_branch" 2>/dev/null; then
+        :
+    elif git checkout -t "origin/${target_branch}" 2>/dev/null; then
+        :
+    else
+        echo "⚠️ Failed to switch to ${target_branch}. Skipping pull."
+        return
+    fi
+
+    if ! git pull --ff-only; then
+        echo "⚠️ git pull failed on ${target_branch}. Please check manually."
+    fi
+}
+
 # --- Pre-flight Checks ---
 # 1. Check for Gemini API Key
 if [[ -z "${GEMINI_API_KEY:-}" ]]; then
@@ -84,6 +122,7 @@ if [[ "$existing_pr_count" -gt 0 ]]; then
                 echo "🔄 Merging existing PR #${existing_pr_number} with '${merge_flag_existing#--}' strategy..."
                 if gh pr merge "$existing_pr_number" "$merge_flag_existing"; then
                     echo "✅ PR merged successfully."
+                    maybe_sync_default_branch
                 else
                     echo "❌ Failed to merge PR #${existing_pr_number}. Please check it manually."
                 fi
@@ -429,6 +468,7 @@ if [[ ! "${create_pr}" =~ ^[Nn]$ ]]; then
         echo "🔄 Merging PR #${pr_number} with '${merge_flag#--}' strategy..."
         if gh pr merge "$pr_number" "$merge_flag"; then
             echo "✅ PR merged successfully."
+            maybe_sync_default_branch
         else
             echo "❌ Failed to merge PR. Please check the PR manually."
         fi
