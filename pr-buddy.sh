@@ -147,7 +147,7 @@ The JSON object must have the following structure:
     *   Under each category, list each major change using the following nested structure:
         *   Start with a primary bullet point (`*`). The line must begin with a **bolded, descriptive title** that summarizes the change, followed by a colon.
         *   Immediately after the colon, write a detailed paragraph explaining the change, its impact, and the technical reasoning.
-        *   On a new line, add a nested and **bolded** bullet point that contains only the issue reference.
+        *   On a new line, add a nested and **bolded** bullet point for the linked issue reference. Format it as either `Fixes #{issue_number}` or `Closes #{issue_number}`. Do not use any other verbs (e.g., avoid `Implements`, `Addresses`, etc.).
     *   **Important Rules:**
         *   Each issue number (e.g., `#26`) may only appear **once** in the entire PR description. If multiple changes relate to the same issue, merge them into a single bullet point that collectively describes all relevant changes for that issue.
         *   Do **not** repeat the same issue reference under multiple bullet points or categories.
