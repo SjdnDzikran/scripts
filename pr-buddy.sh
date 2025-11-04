@@ -78,7 +78,7 @@ if [[ "$existing_pr_count" -gt 0 ]]; then
             esac
 
             echo "🔄 Merging existing PR #${existing_pr_number} with '${merge_flag_existing#--}' strategy..."
-            if gh pr merge "$existing_pr_number" "$merge_flag_existing" --delete-branch; then
+            if gh pr merge "$existing_pr_number" "$merge_flag_existing"; then
                 echo "✅ PR merged successfully."
             else
                 echo "❌ Failed to merge PR #${existing_pr_number}. Please check it manually."
@@ -422,7 +422,7 @@ if [[ ! "${create_pr}" =~ ^[Nn]$ ]]; then
         fi
 
         echo "🔄 Merging PR #${pr_number} with '${merge_flag#--}' strategy..."
-        if gh pr merge "$pr_number" "$merge_flag" --delete-branch; then
+        if gh pr merge "$pr_number" "$merge_flag"; then
             echo "✅ PR merged successfully."
         else
             echo "❌ Failed to merge PR. Please check the PR manually."
