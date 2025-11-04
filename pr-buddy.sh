@@ -349,8 +349,8 @@ if [[ ! "${create_pr}" =~ ^[Nn]$ ]]; then
         echo "✅ PR created."
     fi
 
-    read -p "Do you want to merge this PR now? (y/N): " merge_now
-    if [[ "$merge_now" =~ ^[Yy]$ ]]; then
+    read -p "Do you want to merge this PR now? (Y/n): " merge_now
+    if [[ ! "$merge_now" =~ ^[Nn]$ ]]; then
         default_merge="squash"
         read -p "Choose merge method ([m]erge/[s]quash/[r]ebase) [default: ${default_merge}]: " merge_choice
         merge_choice=$(echo "$merge_choice" | tr '[:upper:]' '[:lower:]')
