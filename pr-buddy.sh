@@ -331,7 +331,58 @@ if [[ ! "${create_pr}" =~ ^[Nn]$ ]]; then
         echo "🏷️  Applying labels: ${label_display}"
     fi
 
-    gh pr create "${gh_pr_args[@]}"
+    pr_data=$(gh pr create "${gh_pr_args[@]}")
+    if [[ -z "$pr_data" ]]; then
+        echo "❌ Failed to create PR."
+        exit 1
+    fi
+
+    pr_url=$(echo "$pr_data" | awk 'NF' | tail -n1)
+    pr_number=""
+    if [[ "$pr_url" =~ /pull/([0-9]+) ]]; then
+        pr_number="${BASH_REMATCH[1]}"
+    fi
+
+    if [[ -n "$pr_url" ]]; then
+        echo "✅ PR created: ${pr_url}"
+    else
+        echo "✅ PR created."
+    fi
+
+    read -p "Do you want to merge this PR now? (Y/n): " merge_now
+    if [[ ! "$merge_now" =~ ^[Nn]$ ]]; then
+        default_merge="squash"
+        read -p "Choose merge method ([m]erge/[s]quash/[r]ebase) [default: ${default_merge}]: " merge_choice
+        merge_choice=$(echo "$merge_choice" | tr '[:upper:]' '[:lower:]')
+        merge_flag="--squash"
+        case "$merge_choice" in
+            m|merge)
+                merge_flag="--merge"
+                ;;
+            r|rebase)
+                merge_flag="--rebase"
+                ;;
+            ""|s|squash)
+                merge_flag="--squash"
+                ;;
+            *)
+                echo "⚠️  Unknown option '${merge_choice}'. Using squash merge."
+                merge_flag="--squash"
+                ;;
+        esac
+
+        if [[ -z "$pr_number" ]]; then
+            echo "❌ Unable to determine PR number for merging."
+            exit 1
+        fi
+
+        echo "🔄 Merging PR #${pr_number} with '${merge_flag#--}' strategy..."
+        if gh pr merge "$pr_number" "$merge_flag" --confirm --delete-branch; then
+            echo "✅ PR merged successfully."
+        else
+            echo "❌ Failed to merge PR. Please check the PR manually."
+        fi
+    fi
 fi
 
 echo "✅ Done."
