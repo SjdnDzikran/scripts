@@ -48,6 +48,51 @@ to_branch=${to_branch:-$default_branch}
 echo "------------------------------"
 echo "➡️  Comparing branches: ${from_branch} -> ${to_branch}"
 
+existing_pr_json=$(gh pr list --state open --head "$from_branch" --base "$to_branch" --json number,url -L 1 2>/dev/null || echo "[]")
+existing_pr_count=$(echo "$existing_pr_json" | jq 'length' 2>/dev/null || echo "0")
+if [[ "$existing_pr_count" -gt 0 ]]; then
+    existing_pr_url=$(echo "$existing_pr_json" | jq -r '.[0].url // empty')
+    existing_pr_number=$(echo "$existing_pr_json" | jq -r '.[0].number // empty')
+    echo "⚠️  Found an open PR from ${from_branch} to ${to_branch}: ${existing_pr_url}"
+    if [[ -n "$existing_pr_number" ]]; then
+        read -p "Do you want to merge PR #${existing_pr_number} now? (Y/n): " merge_existing
+        if [[ ! "$merge_existing" =~ ^[Nn]$ ]]; then
+            default_existing_merge="squash"
+            read -p "Choose merge method ([m]erge/[s]quash/[r]ebase) [default: ${default_existing_merge}]: " merge_choice_existing
+            merge_choice_existing=$(echo "$merge_choice_existing" | tr '[:upper:]' '[:lower:]')
+            merge_flag_existing="--squash"
+            case "$merge_choice_existing" in
+                m|merge)
+                    merge_flag_existing="--merge"
+                    ;;
+                r|rebase)
+                    merge_flag_existing="--rebase"
+                    ;;
+                ""|s|squash)
+                    merge_flag_existing="--squash"
+                    ;;
+                *)
+                    echo "⚠️  Unknown option '${merge_choice_existing}'. Using squash merge."
+                    merge_flag_existing="--squash"
+                    ;;
+            esac
+
+            echo "🔄 Merging existing PR #${existing_pr_number} with '${merge_flag_existing#--}' strategy..."
+            if gh pr merge "$existing_pr_number" "$merge_flag_existing" --delete-branch; then
+                echo "✅ PR merged successfully."
+            else
+                echo "❌ Failed to merge PR #${existing_pr_number}. Please check it manually."
+            fi
+            echo "✅ Done."
+            exit 0
+        else
+            echo "ℹ️  Skipping merge of existing PR."
+        fi
+    else
+        echo "⚠️  Could not determine PR number. Skipping merge prompt."
+    fi
+fi
+
 # --- Step 2: Get the code diff ---
 echo "🔄  Fetching latest changes and getting diff..."
 git fetch origin "${to_branch}" --quiet
@@ -377,7 +422,7 @@ if [[ ! "${create_pr}" =~ ^[Nn]$ ]]; then
         fi
 
         echo "🔄 Merging PR #${pr_number} with '${merge_flag#--}' strategy..."
-        if gh pr merge "$pr_number" "$merge_flag" --confirm --delete-branch; then
+        if gh pr merge "$pr_number" "$merge_flag" --delete-branch; then
             echo "✅ PR merged successfully."
         else
             echo "❌ Failed to merge PR. Please check the PR manually."
