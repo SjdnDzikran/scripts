@@ -377,7 +377,7 @@ if [[ ! "${create_pr}" =~ ^[Nn]$ ]]; then
         fi
 
         echo "🔄 Merging PR #${pr_number} with '${merge_flag#--}' strategy..."
-        if gh pr merge "$pr_number" "$merge_flag" --confirm --delete-branch; then
+        if gh pr merge "$pr_number" "$merge_flag" --delete-branch; then
             echo "✅ PR merged successfully."
         else
             echo "❌ Failed to merge PR. Please check the PR manually."
