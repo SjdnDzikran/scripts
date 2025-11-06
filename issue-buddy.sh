@@ -77,6 +77,8 @@ declare -a gh_args=(
     --body "$issue_body"
 )
 
+gh_args+=(--assignee "@me")
+
 for label in "${selected_labels[@]}"; do
     gh_args+=(--label "$label")
 done
