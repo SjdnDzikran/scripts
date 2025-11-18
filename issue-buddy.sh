@@ -92,7 +92,9 @@ else
     echo "Body: (none)"
 fi
 if ((${#selected_labels[@]} > 0)); then
-    echo "Labels: ${selected_labels[*]}"
+    labels_joined=$(printf "%s, " "${selected_labels[@]}")
+    labels_joined=${labels_joined%, }
+    echo "Labels: ${labels_joined}"
 else
     echo "Labels: (none)"
 fi
