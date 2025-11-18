@@ -63,3 +63,7 @@ A command-line helper that prepares high-quality pull request titles and descrip
 2. Run `pr-buddy` and follow the prompts to pick the source and target branches.
 3. Select the GitHub issues that the PR should close. PR Buddy automatically aggregates their labels for the PR.
 4. Review the generated title and description. If everything looks good, choose to create the PR; the script will call `gh pr create` with the populated metadata.
+
+## Label Buddy
+
+If you need a quick way to create issue/PR labels in the current repository, run `./label-buddy.sh` (or place it in your `PATH`). The script suggests a random famous color each run (Ferrari Red, Tiffany Blue, etc.), lets you override it, and prompts for the label name plus optional description before calling the GitHub CLI to create or update the label in the active repo context.
