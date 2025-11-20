@@ -281,7 +281,9 @@ else
             --multi \
             --bind "space:toggle,enter:accept-non-empty" \
             --header="Space: select, Enter: confirm selection, Esc: skip" \
-            --prompt="Select issues: " || true
+            --prompt="Select issues: " \
+            --height=100% \
+            --border || true
     )
 
     # FIX: Use a robust `while read` loop to parse fzf output.
