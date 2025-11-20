@@ -1,4 +1,4 @@
-# PR Buddy
+# GitHub Workflow Scripts
 
 [![License](https://img.shields.io/github/license/SjdnDzikran/scripts)](LICENSE)
 [![Open Issues](https://img.shields.io/github/issues/SjdnDzikran/scripts)](https://github.com/SjdnDzikran/scripts/issues)
@@ -6,66 +6,51 @@
 [![Last Commit](https://img.shields.io/github/last-commit/SjdnDzikran/scripts/master)](https://github.com/SjdnDzikran/scripts/commits/master)
 [![Shell](https://img.shields.io/badge/shell-bash-4EAA25.svg)](https://www.gnu.org/software/bash/)
 
-A command-line helper that prepares high-quality pull request titles and descriptions using Gemini, grounded in your git diff and the GitHub issues you link. After previewing the generated content, PR Buddy can open the PR in GitHub with the right branches, assignee, and label set inherited from the referenced issues.
+A small toolkit of Bash helpers that streamline GitHub workflows: generating PR descriptions with AI, creating issues, and managing labels from the terminal.
 
-## Requirements
+Scripts: [PR Buddy](#pr-buddy) · [Issue Buddy](#issue-buddy) · [Label Buddy](#label-buddy) · [Label Attach](#label-attach) · [List Issues](#list-issues)
 
-- Google Gemini API key with access to `gemini-2.5-pro`
-- Git repository with a configured `origin` remote
-- CLI tools:
-  - `git`, `curl`, `jq`, `fzf`
-  - `gh` (GitHub CLI) for creating the PR and fetching issues with labels
+## Common Requirements
 
-## Setup
+- `gh` (GitHub CLI) authenticated (`gh auth login`)
+- `jq` and `fzf` for interactive selection (optional fallback paths exist)
+- A git repo with an `origin` remote for PR-related scripts
+- Additional per-script needs are called out below.
 
-1. **Download the script**
-   ```bash
-   curl -o ~/bin/pr-buddy.sh https://raw.githubusercontent.com/<your-repo>/pr-buddy.sh
-   chmod +x ~/bin/pr-buddy.sh
-   ```
+## PR Buddy
 
-2. **Install required tools**
-   ```bash
-   # macOS (Homebrew)
-   brew install git curl jq fzf gh
+`pr-buddy.sh` prepares high-quality pull request titles and descriptions using Gemini, grounded in your git diff and linked issues. It can also open the PR with branches, labels, and assignee set.
 
-   # Debian / Ubuntu
-   sudo apt update
-   sudo apt install git curl jq fzf gh
-   ```
+**Extra requirements**
+- Google Gemini API key with access to `gemini-2.5-pro` (`export GEMINI_API_KEY=...`)
+- `git`, `curl`, `jq`, `fzf`, `gh`
 
-3. **Configure the Gemini API key**
-   Edit your shell profile (`~/.zshrc` or `~/.bashrc`) and add:
-   ```bash
-   export GEMINI_API_KEY="your_gemini_api_key"
-   ```
-   Reload the profile or start a new terminal session to pick up the change.
+**Quick start**
+1) Commit or stage changes on your feature branch.  
+2) Run `./pr-buddy.sh` and pick source/target branches.  
+3) Select issues to close; the script pulls their labels automatically.  
+4) Review the generated title and description, then let it create/update the PR via `gh pr create`.
 
-4. **Authenticate the GitHub CLI**
-   ```bash
-   gh auth login
-   ```
-   Follow the prompts to sign in with the account that owns the repository.
+## Issue Buddy
 
-5. **Create a convenient alias**
-   Append this line to your shell profile so you can run the script from any directory:
-   ```bash
-   alias pr-buddy="~/bin/pr-buddy.sh"
-   ```
-   Reload your profile:
-   ```bash
-   source ~/.zshrc   # or: source ~/.bashrc
-   ```
+`issue-buddy.sh` creates a GitHub issue from the terminal with optional body and label selection (multi-select via `fzf` or numeric entry fallback).
 
-## Usage
-
-1. Commit or stage your changes as usual, then switch to the feature branch you want to merge.
-2. Run `pr-buddy` and follow the prompts to pick the source and target branches.
-3. Select the GitHub issues that the PR should close. PR Buddy automatically aggregates their labels for the PR.
-4. Review the generated title and description. If everything looks good, choose to create the PR; the script will call `gh pr create` with the populated metadata.
+**Run it:** `./issue-buddy.sh`
 
 ## Label Buddy
 
-If you need a quick way to create issue/PR labels in the current repository, run `./label-buddy.sh` (or place it in your `PATH`). The script suggests a random famous color each run (Ferrari Red, Tiffany Blue, etc.), lets you override it, and prompts for the label name plus optional description before calling the GitHub CLI to create or update the label in the active repo context.
+`label-buddy.sh` creates or updates a label in the current repo. It suggests a random famous color, lets you override it, and supports an optional description.
 
-To attach labels to an existing open issue or PR, use `./label-attach.sh` and pick the target interactively (fzf supported), then choose labels to add in one go.
+**Run it:** `./label-buddy.sh`
+
+## Label Attach
+
+`label-attach.sh` adds labels to an existing open issue or PR. Pick the target with `fzf` (or by number), then multi-select labels in the same styled picker.
+
+**Run it:** `./label-attach.sh`
+
+## List Issues
+
+`list-issues.sh` prints open issues with their numbers, titles, URLs, and labels.
+
+**Run it:** `./list-issues.sh`
