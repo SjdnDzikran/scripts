@@ -54,7 +54,7 @@ mapfile -t item_numbers < <(echo "$items_json" | jq -r '.[].number')
 selected_line=""
 if command -v fzf &>/dev/null; then
     echo "Tip: type to filter, ↑/↓ to move, Enter to pick."
-    selected_line=$(printf "%s\n" "${item_lines[@]}" | fzf --prompt="Select ${target_type}: " --height=20 --border --layout=reverse || true)
+    selected_line=$(printf "%s\n" "${item_lines[@]}" | fzf --prompt="Select ${target_type}: " --height=100% --border || true)
 fi
 
 if [[ -z "$selected_line" ]]; then
@@ -97,7 +97,7 @@ declare -a selected_labels=()
 if ((${#labels_available[@]} > 0)); then
     if command -v fzf &>/dev/null; then
         echo "Select labels to add (space to toggle, enter to confirm). Type to filter."
-        label_selection=$(printf "%s\n" "${labels_available[@]}" | fzf --multi --bind "space:toggle" --prompt="Labels: " --height=20 --border  || true)
+        label_selection=$(printf "%s\n" "${labels_available[@]}" | fzf --multi --bind "space:toggle" --prompt="Labels: " --height=100% --border || true)
         while IFS= read -r label; do
             [[ -n "$label" ]] && selected_labels+=("$label")
         done <<<"$label_selection"

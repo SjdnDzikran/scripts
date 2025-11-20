@@ -40,7 +40,7 @@ mapfile -t labels_array < <(gh label list --json name --jq '.[].name' 2>/dev/nul
 if ((${#labels_array[@]} > 0)); then
     if command -v fzf &>/dev/null; then
         echo "Select labels (space to toggle, enter to confirm):"
-        label_selection=$(printf "%s\n" "${labels_array[@]}" | fzf --multi --bind "space:toggle" --prompt="Labels: " || true)
+        label_selection=$(printf "%s\n" "${labels_array[@]}" | fzf --multi --bind "space:toggle" --prompt="Labels: " --height=100% --border || true)
         while IFS= read -r label; do
             [[ -n "$label" ]] && selected_labels+=("$label")
         done <<<"$label_selection"

@@ -203,7 +203,7 @@ if not issues_list.strip():
 else:
     print("✅ Select related issues (space to toggle, enter to confirm):")
     fzf_proc = subprocess.run(
-        "fzf --multi --bind 'space:toggle' --prompt='Select issues: '",
+        "fzf --multi --bind 'space:toggle' --prompt='Select issues: ' --height=100% --border",
         input=issues_list,
         text=True,
         capture_output=True,

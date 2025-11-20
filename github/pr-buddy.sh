@@ -281,7 +281,9 @@ else
             --multi \
             --bind "space:toggle,enter:accept-non-empty" \
             --header="Space: select, Enter: confirm selection, Esc: skip" \
-            --prompt="Select issues: " || true
+            --prompt="Select issues: " \
+            --height=100% \
+            --border || true
     )
 
     # FIX: Use a robust `while read` loop to parse fzf output.
@@ -352,7 +354,7 @@ json_payload=$(
 rm "$tmpfile"
 
 # Using gemini-2.5-pro as it's fast and great for structured output
-API_URL="https://generativelanguage.googleapis.com/v1beta/models/gemini-3-pro-preview:generateContent?key=${GEMINI_API_KEY}"
+API_URL="https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent?key=${GEMINI_API_KEY}"
 
 payload_file=$(mktemp)
 printf '%s' "$json_payload" > "$payload_file"
