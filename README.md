@@ -67,3 +67,5 @@ A command-line helper that prepares high-quality pull request titles and descrip
 ## Label Buddy
 
 If you need a quick way to create issue/PR labels in the current repository, run `./label-buddy.sh` (or place it in your `PATH`). The script suggests a random famous color each run (Ferrari Red, Tiffany Blue, etc.), lets you override it, and prompts for the label name plus optional description before calling the GitHub CLI to create or update the label in the active repo context.
+
+To attach labels to an existing open issue or PR, use `./label-attach.sh` and pick the target interactively (fzf supported), then choose labels to add in one go.
