@@ -275,8 +275,14 @@ declare -A label_seen=()
 if [[ -z "$issues_list" ]]; then
     echo "⚠️  No open issues found."
 else
-    echo "✅  Select related issues (space to toggle, enter to confirm):"
-    selected=$(echo "$issues_list" | fzf --multi --bind "space:toggle" --prompt="Select issues: ")
+    echo "✅  Select related issues (space to toggle, enter to confirm, esc to skip):"
+    selected=$(
+        echo "$issues_list" | fzf \
+            --multi \
+            --bind "space:toggle,enter:accept-non-empty" \
+            --header="Space: select, Enter: confirm selection, Esc: skip" \
+            --prompt="Select issues: " || true
+    )
 
     # FIX: Use a robust `while read` loop to parse fzf output.
     # This correctly handles issue titles with special characters like single quotes,
@@ -346,7 +352,7 @@ json_payload=$(
 rm "$tmpfile"
 
 # Using gemini-2.5-pro as it's fast and great for structured output
-API_URL="https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent?key=${GEMINI_API_KEY}"
+API_URL="https://generativelanguage.googleapis.com/v1beta/models/gemini-3-pro-preview:generateContent?key=${GEMINI_API_KEY}"
 
 payload_file=$(mktemp)
 printf '%s' "$json_payload" > "$payload_file"
