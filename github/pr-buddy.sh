@@ -120,11 +120,20 @@ if [[ "$existing_pr_count" -gt 0 ]]; then
                 esac
 
                 echo "🔄 Merging existing PR #${existing_pr_number} with '${merge_flag_existing#--}' strategy..."
-                if gh pr merge "$existing_pr_number" "$merge_flag_existing"; then
+                merge_output_existing=$(gh pr merge "$existing_pr_number" "$merge_flag_existing" 2>&1)
+                merge_status=$?
+                if [[ $merge_status -ne 0 && "$merge_output_existing" == *"add the `--auto` flag"* ]]; then
+                    echo "ℹ️  Merge is gated by required checks. Retrying with auto-merge..."
+                    merge_output_existing=$(gh pr merge "$existing_pr_number" "$merge_flag_existing" --auto 2>&1)
+                    merge_status=$?
+                fi
+
+                if [[ $merge_status -eq 0 ]]; then
                     echo "✅ PR merged successfully."
                     maybe_sync_default_branch
                 else
                     echo "❌ Failed to merge PR #${existing_pr_number}. Please check it manually."
+                    echo "$merge_output_existing"
                 fi
                 echo "✅ Done."
                 exit 0
@@ -474,11 +483,20 @@ if [[ ! "${create_pr}" =~ ^[Nn]$ ]]; then
         fi
 
         echo "🔄 Merging PR #${pr_number} with '${merge_flag#--}' strategy..."
-        if gh pr merge "$pr_number" "$merge_flag"; then
+        merge_output=$(gh pr merge "$pr_number" "$merge_flag" 2>&1)
+        merge_status=$?
+        if [[ $merge_status -ne 0 && "$merge_output" == *"add the `--auto` flag"* ]]; then
+            echo "ℹ️  Merge is gated by required checks. Retrying with auto-merge..."
+            merge_output=$(gh pr merge "$pr_number" "$merge_flag" --auto 2>&1)
+            merge_status=$?
+        fi
+
+        if [[ $merge_status -eq 0 ]]; then
             echo "✅ PR merged successfully."
             maybe_sync_default_branch
         else
             echo "❌ Failed to merge PR. Please check the PR manually."
+            echo "$merge_output"
         fi
     fi
 fi
