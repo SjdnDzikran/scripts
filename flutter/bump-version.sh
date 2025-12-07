@@ -69,8 +69,6 @@ case "$bump_choice" in
         ;;
 esac
 
-# Reset build number after a version bump
-build_number="0"
 new_version="${major}.${minor}.${patch}"
 if [[ -n "$build_number" ]]; then
     new_version+="+${build_number}"
