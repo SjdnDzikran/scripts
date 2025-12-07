@@ -12,8 +12,13 @@ if [[ ! -f "$pubspec_path" ]]; then
     exit 1
 fi
 
-# Extract the current version value (e.g., 1.2.3 or 1.2.3+4)
-version_line=$(grep -E '^[[:space:]]*version:' "$pubspec_path" | head -n1 | sed -E 's/^[[:space:]]*version:[[:space:]]*//')
+# Extract the current version value (e.g., 1.2.3 or 1.2.3+4), trim comments/whitespace/CRLF.
+version_line=$(grep -E '^[[:space:]]*version:' "$pubspec_path" \
+    | head -n1 \
+    | sed -E 's/^[[:space:]]*version:[[:space:]]*//' \
+    | cut -d'#' -f1 \
+    | tr -d '[:space:]' \
+    | tr -d '\r')
 if [[ -z "$version_line" ]]; then
     echo "Error: Could not find a version in $pubspec_path."
     exit 1
