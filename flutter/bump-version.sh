@@ -48,7 +48,7 @@ if [[ -n "$build_number" && ! "$build_number" =~ ^[0-9]+$ ]]; then
 fi
 
 echo "Current version: $version_line (from $pubspec_path)"
-read -p "Bump which part? [p]atch/[m]inor/[M]ajor (default: patch): " bump_choice
+read -p "Bump which part? [M]ajor/[m]inor/[p]atch (default: patch): " bump_choice
 
 case "$bump_choice" in
     M|major|MAJOR)
