@@ -430,15 +430,19 @@ json_payload=$(
 )
 rm "$tmpfile"
 
-# Using gemini-2.5-pro as it's fast and great for structured output
-API_URL="https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent?key=${GEMINI_API_KEY}"
+# Using gemini-2.5-flash with header-based API key per latest Gemini guidance
+API_URL="https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent"
 
 payload_file=$(mktemp)
 printf '%s' "$json_payload" > "$payload_file"
 
 fallback_generated_json=""
 api_response=$(
-    curl -s -H "Content-Type: application/json" -d @"$payload_file" "$API_URL"
+    curl -s \
+        -H "x-goog-api-key: ${GEMINI_API_KEY}" \
+        -H "Content-Type: application/json" \
+        -d @"$payload_file" \
+        "$API_URL"
 )
 
 rm "$payload_file"
