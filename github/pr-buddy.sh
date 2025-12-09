@@ -47,6 +47,48 @@ maybe_sync_default_branch() {
     fi
 }
 
+merge_pr() {
+    local pr_number="$1"
+    local merge_flag="$2"
+    local merge_output_file merge_output merge_status
+
+    if [[ -z "$pr_number" ]]; then
+        echo "❌ Unable to determine PR number for merging."
+        return 1
+    fi
+
+    echo "🔄 Merging PR #${pr_number} with '${merge_flag#--}' strategy (auto-merge if checks pending)..."
+    merge_output_file=$(mktemp)
+    gh pr merge "$pr_number" "$merge_flag" --auto 2>&1 | tee /dev/tty | tee "$merge_output_file" >/dev/null
+    merge_status=${PIPESTATUS[0]}
+    merge_output=$(cat "$merge_output_file")
+    rm -f "$merge_output_file"
+
+    # Fallback: if auto-merge is not allowed on the repo, try without it.
+    if [[ $merge_status -ne 0 && "$merge_output" == *"auto-merge"* && "$merge_output" == *"not"* ]]; then
+        echo "ℹ️  Auto-merge not available. Retrying without --auto..."
+        merge_output_file=$(mktemp)
+        gh pr merge "$pr_number" "$merge_flag" 2>&1 | tee /dev/tty | tee "$merge_output_file" >/dev/null
+        merge_status=${PIPESTATUS[0]}
+        merge_output=$(cat "$merge_output_file")
+        rm -f "$merge_output_file"
+    fi
+
+    if [[ $merge_status -eq 0 ]]; then
+        if [[ "$merge_output" == *"queued"* || "$merge_output" == *"automatically"* ]]; then
+            echo "✅ Auto-merge enabled; PR will merge once requirements pass."
+        else
+            echo "✅ PR merged successfully."
+        fi
+        maybe_sync_default_branch
+        return 0
+    fi
+
+    echo "❌ Failed to merge PR #${pr_number}. Please check it manually."
+    echo "$merge_output"
+    return 1
+}
+
 # --- Pre-flight Checks ---
 # 1. Check for Gemini API Key
 if [[ -z "${GEMINI_API_KEY:-}" ]]; then
@@ -69,6 +111,47 @@ if ! git rev-parse --is-inside-work-tree &>/dev/null; then
     echo "Error: This script must be run from within a Git repository."
     exit 1
 fi
+
+repo_root=$(git rev-parse --show-toplevel)
+
+try_openrouter_fallback() {
+    local prompt_text="$1"
+    local openrouter_payload openrouter_response fallback_text
+
+    if [[ -z "${OPENROUTER_API_KEY:-}" ]]; then
+        echo "ℹ️ OPENROUTER_API_KEY not set; skipping OpenRouter fallback."
+        return 1
+    fi
+
+    echo "🤖 Trying OpenRouter fallback (tngtech/deepseek-r1t2-chimera:free)..."
+    openrouter_payload=$(jq -n --arg content "$prompt_text" '{
+        model: "tngtech/deepseek-r1t2-chimera:free",
+        messages: [ { role: "user", content: $content } ]
+    }')
+
+    openrouter_response=$(
+        curl -s \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer ${OPENROUTER_API_KEY}" \
+            -d "$openrouter_payload" \
+            "https://openrouter.ai/api/v1/chat/completions"
+    )
+
+    if echo "$openrouter_response" | jq -e '.error' >/dev/null; then
+        echo "❌ OpenRouter error:"
+        echo "$openrouter_response" | jq .
+        return 1
+    fi
+
+    fallback_text=$(echo "$openrouter_response" | jq -r '.choices[0].message.content // empty')
+    if [[ -z "$fallback_text" ]]; then
+        echo "❌ OpenRouter returned no content."
+        return 1
+    fi
+
+    fallback_generated_json="$fallback_text"
+    return 0
+}
 
 echo "✅ Pre-flight checks passed."
 echo "------------------------------"
@@ -119,22 +202,7 @@ if [[ "$existing_pr_count" -gt 0 ]]; then
                         ;;
                 esac
 
-                echo "🔄 Merging existing PR #${existing_pr_number} with '${merge_flag_existing#--}' strategy..."
-                merge_output_existing=$(gh pr merge "$existing_pr_number" "$merge_flag_existing" 2>&1)
-                merge_status=$?
-                if [[ $merge_status -ne 0 && "$merge_output_existing" == *"add the `--auto` flag"* ]]; then
-                    echo "ℹ️  Merge is gated by required checks. Retrying with auto-merge..."
-                    merge_output_existing=$(gh pr merge "$existing_pr_number" "$merge_flag_existing" --auto 2>&1)
-                    merge_status=$?
-                fi
-
-                if [[ $merge_status -eq 0 ]]; then
-                    echo "✅ PR merged successfully."
-                    maybe_sync_default_branch
-                else
-                    echo "❌ Failed to merge PR #${existing_pr_number}. Please check it manually."
-                    echo "$merge_output_existing"
-                fi
+                merge_pr "$existing_pr_number" "$merge_flag_existing"
                 echo "✅ Done."
                 exit 0
             else
@@ -368,20 +436,37 @@ API_URL="https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:
 payload_file=$(mktemp)
 printf '%s' "$json_payload" > "$payload_file"
 
+fallback_generated_json=""
 api_response=$(
     curl -s -H "Content-Type: application/json" -d @"$payload_file" "$API_URL"
 )
 
 rm "$payload_file"
 
+generated_json=""
 if echo "$api_response" | jq -e '.error' >/dev/null; then
-    echo "❌ Error received from Gemini API:"
-    echo "$api_response" | jq .
-    exit 1
+    error_status=$(echo "$api_response" | jq -r '.error.status // ""')
+    error_code=$(echo "$api_response" | jq -r '.error.code // ""')
+    if [[ "$error_status" == "RESOURCE_EXHAUSTED" || "$error_code" == "429" ]]; then
+        if try_openrouter_fallback "$full_prompt_text"; then
+            echo "✅ OpenRouter fallback succeeded."
+            generated_json="$fallback_generated_json"
+        else
+            prompt_file="${repo_root}/pr-buddy-last-prompt.txt"
+            printf '%s\n' "$full_prompt_text" > "$prompt_file"
+            echo "❌ Gemini quota exceeded. Saved the prompt to $prompt_file"
+            echo "$api_response" | jq .
+            exit 1
+        fi
+    else
+        echo "❌ Error received from Gemini API:"
+        echo "$api_response" | jq .
+        exit 1
+    fi
+else
+    # MODIFIED: Extract the raw text which should be our JSON
+    generated_json=$(echo "$api_response" | jq -r '.candidates[0].content.parts[0].text')
 fi
-
-# MODIFIED: Extract the raw text which should be our JSON
-generated_json=$(echo "$api_response" | jq -r '.candidates[0].content.parts[0].text')
 
 # NEW: Validate if the output is valid JSON
 if ! echo "$generated_json" | jq -e . >/dev/null 2>&1; then
@@ -482,22 +567,7 @@ if [[ ! "${create_pr}" =~ ^[Nn]$ ]]; then
             exit 1
         fi
 
-        echo "🔄 Merging PR #${pr_number} with '${merge_flag#--}' strategy..."
-        merge_output=$(gh pr merge "$pr_number" "$merge_flag" 2>&1)
-        merge_status=$?
-        if [[ $merge_status -ne 0 && "$merge_output" == *"add the `--auto` flag"* ]]; then
-            echo "ℹ️  Merge is gated by required checks. Retrying with auto-merge..."
-            merge_output=$(gh pr merge "$pr_number" "$merge_flag" --auto 2>&1)
-            merge_status=$?
-        fi
-
-        if [[ $merge_status -eq 0 ]]; then
-            echo "✅ PR merged successfully."
-            maybe_sync_default_branch
-        else
-            echo "❌ Failed to merge PR. Please check the PR manually."
-            echo "$merge_output"
-        fi
+        merge_pr "$pr_number" "$merge_flag"
     fi
 fi
 
