@@ -431,7 +431,7 @@ json_payload=$(
 rm "$tmpfile"
 
 # Using gemini-2.5-flash with header-based API key per latest Gemini guidance
-API_URL="https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent"
+API_URL="https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
 
 payload_file=$(mktemp)
 printf '%s' "$json_payload" > "$payload_file"
