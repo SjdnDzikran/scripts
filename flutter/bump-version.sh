@@ -52,16 +52,16 @@ read -p "Bump which part? [M]ajor/[m]inor/[p]atch (default: patch): " bump_choic
 
 case "$bump_choice" in
     M|major|MAJOR)
-        ((major++))
+        ((major+=1))
         minor=0
         patch=0
         ;;
     m|minor|MINOR)
-        ((minor++))
+        ((minor+=1))
         patch=0
         ;;
     ""|p|P|patch|PATCH)
-        ((patch++))
+        ((patch+=1))
         ;;
     *)
         echo "Error: Unknown choice '$bump_choice'."
