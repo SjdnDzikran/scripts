@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 #
-# issue-edit.sh: Helper to edit GitHub issues from the terminal.
+# issue-edit.sh: A script to edit GitHub issues from the terminal,
+# with prefilled inputs for faster updates.
 
 set -euo pipefail
 
@@ -142,10 +143,14 @@ else
     selected_labels=("${current_labels[@]}")
 fi
 
-read -rp "Change state (open/closed/leave blank to keep current): " new_state
+read -rp "Change state ([o]pen/[c]losed, leave blank to keep current): " new_state
 new_state=$(echo "$new_state" | tr '[:upper:]' '[:lower:]')
 if [[ -z "$new_state" ]]; then
     new_state="$current_state"
+elif [[ "$new_state" == "o" ]]; then
+    new_state="open"
+elif [[ "$new_state" == "c" ]]; then
+    new_state="closed"
 fi
 
 # --- Assemble gh issue edit command ---
