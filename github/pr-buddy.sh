@@ -65,13 +65,16 @@ merge_pr() {
     rm -f "$merge_output_file"
 
     # Fallback: if auto-merge is not allowed on the repo, try without it.
-    if [[ $merge_status -ne 0 && "$merge_output" == *"auto-merge"* && "$merge_output" == *"not"* ]]; then
-        echo "ℹ️  Auto-merge not available. Retrying without --auto..."
-        merge_output_file=$(mktemp)
-        gh pr merge "$pr_number" "$merge_flag" 2>&1 | tee /dev/tty | tee "$merge_output_file" >/dev/null
-        merge_status=${PIPESTATUS[0]}
-        merge_output=$(cat "$merge_output_file")
-        rm -f "$merge_output_file"
+    if [[ $merge_status -ne 0 ]]; then
+        merge_output_lower=$(echo "$merge_output" | tr '[:upper:]' '[:lower:]')
+        if [[ "$merge_output_lower" == *"auto merge"* || "$merge_output_lower" == *"automerge"* || "$merge_output_lower" == *"enablepullrequestautomerge"* ]]; then
+            echo "ℹ️  Auto-merge not available. Retrying without --auto..."
+            merge_output_file=$(mktemp)
+            gh pr merge "$pr_number" "$merge_flag" 2>&1 | tee /dev/tty | tee "$merge_output_file" >/dev/null
+            merge_status=${PIPESTATUS[0]}
+            merge_output=$(cat "$merge_output_file")
+            rm -f "$merge_output_file"
+        fi
     fi
 
     if [[ $merge_status -eq 0 ]]; then
@@ -451,7 +454,7 @@ generated_json=""
 if echo "$api_response" | jq -e '.error' >/dev/null; then
     error_status=$(echo "$api_response" | jq -r '.error.status // ""')
     error_code=$(echo "$api_response" | jq -r '.error.code // ""')
-    if [[ "$error_status" == "RESOURCE_EXHAUSTED" || "$error_code" == "429" ]]; then
+    if [[ "$error_status" == "RESOURCE_EXHAUSTED" || "$error_code" == "429" || "$error_code" == "503" ]]; then
         if try_openrouter_fallback "$full_prompt_text"; then
             echo "✅ OpenRouter fallback succeeded."
             generated_json="$fallback_generated_json"
