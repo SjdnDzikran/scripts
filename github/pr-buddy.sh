@@ -9,8 +9,9 @@ set -e
 set -u
 set -o pipefail
 
-maybe_sync_default_branch() {
-    local repo_path target_branch remote_default
+sync_to_base_branch() {
+    local target_branch="$1"
+    local repo_path
     repo_path=$(pwd)
 
     if [[ "$repo_path" == /mnt/* ]]; then
@@ -18,17 +19,12 @@ maybe_sync_default_branch() {
         return
     fi
 
-    remote_default=$(git remote show origin 2>/dev/null | awk '/HEAD branch/ {print $NF}')
-    if [[ -z "$remote_default" ]]; then
-        remote_default=$(git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's#.*/##')
-    fi
-    if [[ -z "$remote_default" ]]; then
-        echo "⚠️ Skipping branch sync: could not determine the default branch."
+    if [[ -z "$target_branch" ]]; then
+        echo "⚠️ Skipping branch sync: target branch not specified."
         return
     fi
 
-    target_branch="$remote_default"
-    echo "🔁 Switching to ${target_branch} (default branch) and pulling latest changes..."
+    echo "🔁 Switching to ${target_branch} and pulling latest changes..."
     if git switch "$target_branch" 2>/dev/null; then
         :
     elif git switch --track "origin/${target_branch}" 2>/dev/null; then
@@ -50,6 +46,8 @@ maybe_sync_default_branch() {
 merge_pr() {
     local pr_number="$1"
     local merge_flag="$2"
+    local to_branch="$3"
+    local from_branch="$4"
     local merge_output_file merge_output merge_status
 
     if [[ -z "$pr_number" ]]; then
@@ -83,7 +81,25 @@ merge_pr() {
         else
             echo "✅ PR merged successfully."
         fi
-        maybe_sync_default_branch
+        sync_to_base_branch "$to_branch"
+
+        echo "🗑️  Deleting merged branch '${from_branch}'..."
+        if ! git branch -D "$from_branch" 2>/dev/null; then
+            echo "❌ Failed to delete local branch '${from_branch}'."
+            echo "Please handle deletion manually:"
+            echo "  Local: git branch -D $from_branch"
+            echo "  Remote: git push origin --delete $from_branch"
+            return 1
+        fi
+
+        if ! git push origin --delete "$from_branch" 2>/dev/null; then
+            echo "❌ Failed to delete remote branch '${from_branch}'."
+            echo "Please handle deletion manually:"
+            echo "  Remote: git push origin --delete $from_branch"
+            return 1
+        fi
+
+        echo "✅ Branch '${from_branch}' deleted both locally and remotely."
         return 0
     fi
 
@@ -205,7 +221,7 @@ if [[ "$existing_pr_count" -gt 0 ]]; then
                         ;;
                 esac
 
-                merge_pr "$existing_pr_number" "$merge_flag_existing"
+                merge_pr "$existing_pr_number" "$merge_flag_existing" "$to_branch" "$from_branch"
                 echo "✅ Done."
                 exit 0
             else
@@ -574,7 +590,7 @@ if [[ ! "${create_pr}" =~ ^[Nn]$ ]]; then
             exit 1
         fi
 
-        merge_pr "$pr_number" "$merge_flag"
+        merge_pr "$pr_number" "$merge_flag" "$to_branch" "$from_branch"
     fi
 fi
 
