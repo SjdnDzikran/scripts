@@ -74,14 +74,14 @@ fi
 
 echo "🎨 Suggested color: ${random_color_name} (#${random_color_hex})"
 
-read -rp "Label name: " label_name
+read -erp "Label name: " label_name
 label_name=$(echo "$label_name" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
 if [[ -z "$label_name" ]]; then
     echo "❌ Label name cannot be blank."
     exit 1
 fi
 
-read -rp "Label color hex (press Enter to use ${random_color_name} ${random_color_hex}): " label_color
+read -erp "Label color hex (press Enter to use ${random_color_name} ${random_color_hex}): " label_color
 label_color=${label_color:-$random_color_hex}
 label_color=${label_color#"#"}
 if [[ ! "$label_color" =~ ^[0-9A-Fa-f]{6}$ ]]; then
@@ -89,7 +89,7 @@ if [[ ! "$label_color" =~ ^[0-9A-Fa-f]{6}$ ]]; then
     exit 1
 fi
 
-read -rp "Label description (optional): " label_description
+read -erp "Label description (optional): " label_description
 
 declare -a gh_args=(
     --color "$label_color"
@@ -100,7 +100,7 @@ fi
 
 if gh label view "$label_name" &>/dev/null; then
     echo "ℹ️  Label '$label_name' already exists."
-    read -rp "Update existing label with new color/description? (y/N): " update_choice
+    read -erp "Update existing label with new color/description? (y/N): " update_choice
     if [[ ! "$update_choice" =~ ^[Yy]$ ]]; then
         echo "❌ Label already exists; aborting."
         exit 1

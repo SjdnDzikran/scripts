@@ -163,10 +163,10 @@ echo "------------------------------"
 current_branch=$(git rev-parse --abbrev-ref HEAD)
 default_branch=$(git remote show origin | awk '/HEAD branch/ {print $NF}')
 
-read -p "Enter the source branch (from) [default: ${current_branch}]: " from_branch
+read -ep "Enter the source branch (from) [default: ${current_branch}]: " from_branch
 from_branch=${from_branch:-$current_branch}
 
-read -p "Enter the target branch (to) [default: ${default_branch}]: " to_branch
+read -ep "Enter the target branch (to) [default: ${default_branch}]: " to_branch
 to_branch=${to_branch:-$default_branch}
 
 echo "------------------------------"
@@ -179,14 +179,14 @@ if [[ "$existing_pr_count" -gt 0 ]]; then
     existing_pr_number=$(echo "$existing_pr_json" | jq -r '.[0].number // empty')
     echo "⚠️  Found an open PR from ${from_branch} to ${to_branch}: ${existing_pr_url}"
     if [[ -n "$existing_pr_number" ]]; then
-        read -p "Do you want to update PR #${existing_pr_number}? (Y/n): " update_existing_pr
+        read -ep "Do you want to update PR #${existing_pr_number}? (Y/n): " update_existing_pr
         if [[ ! "$update_existing_pr" =~ ^[Nn]$ ]]; then
             echo "ℹ️  Continuing with PR creation flow to update the existing PR context."
         else
-            read -p "Do you want to merge PR #${existing_pr_number} now? (Y/n): " merge_existing
+            read -ep "Do you want to merge PR #${existing_pr_number} now? (Y/n): " merge_existing
             if [[ ! "$merge_existing" =~ ^[Nn]$ ]]; then
                 default_existing_merge="squash"
-                read -p "Choose merge method ([m]erge/[s]quash/[r]ebase) [default: ${default_existing_merge}]: " merge_choice_existing
+                read -ep "Choose merge method ([m]erge/[s]quash/[r]ebase) [default: ${default_existing_merge}]: " merge_choice_existing
                 merge_choice_existing=$(echo "$merge_choice_existing" | tr '[:upper:]' '[:lower:]')
                 merge_flag_existing="--squash"
                 case "$merge_choice_existing" in
@@ -280,7 +280,7 @@ The JSON object must have the following structure:
 ---
 GitHub Issues to close with this PR:'
 
-read -p "Do you want to use the experimental prompt? (Y/n): " use_experimental
+read -ep "Do you want to use the experimental prompt? (Y/n): " use_experimental
 if [[ ! "$use_experimental" =~ ^[Nn]$ ]]; then
     user_prompt=$experimental_prompt
 else
@@ -499,7 +499,7 @@ echo -e "\n---------------------------"
 
 
 # --- Step 6: Automatically create PR (optional) ---
-read -p "Do you want to create a GitHub PR with this? (Y/n): " create_pr
+read -ep "Do you want to create a GitHub PR with this? (Y/n): " create_pr
 if [[ ! "${create_pr}" =~ ^[Nn]$ ]]; then
     if ! command -v gh &>/dev/null; then
         echo "Error: 'gh' command is not installed. Cannot create PR."
@@ -547,10 +547,10 @@ if [[ ! "${create_pr}" =~ ^[Nn]$ ]]; then
         echo "✅ PR created."
     fi
 
-    read -p "Do you want to merge this PR now? (Y/n): " merge_now
+    read -ep "Do you want to merge this PR now? (Y/n): " merge_now
     if [[ ! "$merge_now" =~ ^[Nn]$ ]]; then
         default_merge="squash"
-        read -p "Choose merge method ([m]erge/[s]quash/[r]ebase) [default: ${default_merge}]: " merge_choice
+        read -ep "Choose merge method ([m]erge/[s]quash/[r]ebase) [default: ${default_merge}]: " merge_choice
         merge_choice=$(echo "$merge_choice" | tr '[:upper:]' '[:lower:]')
         merge_flag="--squash"
         case "$merge_choice" in

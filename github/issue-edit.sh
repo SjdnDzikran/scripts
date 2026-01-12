@@ -79,7 +79,7 @@ read -erp "New title (leave blank to keep current): " -i "$current_title" new_ti
 
 new_body="$current_body"
 if [[ -n "${EDITOR:-}" ]]; then
-    read -rp "Edit body in \$EDITOR? (y/N): " edit_body
+    read -erp "Edit body in \$EDITOR? (y/N): " edit_body
     if [[ "$edit_body" =~ ^[Yy]$ ]]; then
         body_file=$(mktemp)
         printf "%s" "$current_body" >"$body_file"
@@ -100,7 +100,7 @@ else
 fi
 
 update_labels="n"
-read -rp "Update labels? (y/N): " update_labels
+read -erp "Update labels? (y/N): " update_labels
 
 selected_labels=()
 if [[ "$update_labels" =~ ^[Yy]$ ]]; then
@@ -118,7 +118,7 @@ if [[ "$update_labels" =~ ^[Yy]$ ]]; then
             for i in "${!labels_array[@]}"; do
                 printf "%2d. %s\n" $((i + 1)) "${labels_array[$i]}"
             done
-            read -rp "Enter label numbers or names separated by commas (leave blank for none): " label_input
+            read -erp "Enter label numbers or names separated by commas (leave blank for none): " label_input
             if [[ -n "$label_input" ]]; then
                 IFS=',' read -r -a label_tokens <<<"$label_input"
                 for token in "${label_tokens[@]}"; do
@@ -143,7 +143,7 @@ else
     selected_labels=("${current_labels[@]}")
 fi
 
-read -rp "Change state ([o]pen/[c]losed, leave blank to keep current): " new_state
+read -erp "Change state ([o]pen/[c]losed, leave blank to keep current): " new_state
 new_state=$(echo "$new_state" | tr '[:upper:]' '[:lower:]')
 if [[ -z "$new_state" ]]; then
     new_state="$current_state"
