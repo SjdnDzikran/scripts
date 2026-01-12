@@ -26,7 +26,7 @@ if ! git rev-parse --is-inside-work-tree &>/dev/null; then
     echo "⚠️  Not inside a git repository. gh will use your default repo context."
 fi
 
-read -rp "Apply labels to an issue or pull request? ([i]ssue/[p]r) [i]: " target_choice
+read -erp "Apply labels to an issue or pull request? ([i]ssue/[p]r) [i]: " target_choice
 target_choice=$(echo "${target_choice:-i}" | tr '[:upper:]' '[:lower:]')
 if [[ "$target_choice" == "p" || "$target_choice" == "pr" ]]; then
     target_type="pr"
@@ -62,7 +62,7 @@ if [[ -z "$selected_line" ]]; then
     for i in "${!item_lines[@]}"; do
         printf "%2d. %s\n" $((i + 1)) "${item_lines[$i]}"
     done
-    read -rp "Choose by list index or type a ${target_type} number: " manual_choice
+    read -erp "Choose by list index or type a ${target_type} number: " manual_choice
     manual_choice=$(echo "$manual_choice" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
     if [[ -z "$manual_choice" ]]; then
         echo "❌ Selection cannot be blank."
@@ -106,7 +106,7 @@ if ((${#labels_available[@]} > 0)); then
         for i in "${!labels_available[@]}"; do
             printf "%2d. %s\n" $((i + 1)) "${labels_available[$i]}"
         done
-        read -rp "Enter label numbers or names separated by commas: " label_input
+        read -erp "Enter label numbers or names separated by commas: " label_input
         IFS=',' read -r -a label_tokens <<<"$label_input"
         for token in "${label_tokens[@]}"; do
             trimmed=$(echo "$token" | sed -e 's/^[ \t]*//' -e 's/[ \t]*$//')
@@ -126,7 +126,7 @@ if ((${#labels_available[@]} > 0)); then
     fi
 else
     echo "ℹ️  No labels found. You can still type label names to add."
-    read -rp "Enter label names separated by commas: " label_input
+    read -erp "Enter label names separated by commas: " label_input
     IFS=',' read -r -a label_tokens <<<"$label_input"
     for token in "${label_tokens[@]}"; do
         trimmed=$(echo "$token" | sed -e 's/^[ \t]*//' -e 's/[ \t]*$//')

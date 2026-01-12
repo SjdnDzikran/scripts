@@ -24,13 +24,13 @@ echo "✅ Ready to create a GitHub issue."
 echo "------------------------------"
 
 # --- Gather user input ---
-read -rp "Issue title: " issue_title
+read -erp "Issue title: " issue_title
 if [[ -z "$issue_title" ]]; then
     echo "❌ Title cannot be empty."
     exit 1
 fi
 
-read -rp "Issue description (optional): " issue_body
+read -erp "Issue description (optional): " issue_body
 
 # --- Collect labels ---
 declare -a selected_labels=()
@@ -49,7 +49,7 @@ if ((${#labels_array[@]} > 0)); then
         for i in "${!labels_array[@]}"; do
             printf "%2d. %s\n" $((i + 1)) "${labels_array[$i]}"
         done
-        read -rp "Enter label numbers or names separated by commas (leave blank for none): " label_input
+        read -erp "Enter label numbers or names separated by commas (leave blank for none): " label_input
         if [[ -n "$label_input" ]]; then
             IFS=',' read -r -a label_tokens <<<"$label_input"
             for token in "${label_tokens[@]}"; do
