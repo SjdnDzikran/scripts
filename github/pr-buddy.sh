@@ -9,6 +9,9 @@ set -e
 set -u
 set -o pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "${SCRIPT_DIR}/../lib/spinner.sh"
+
 sync_to_base_branch() {
     local target_branch="$1"
     local repo_path
@@ -142,7 +145,7 @@ try_openrouter_fallback() {
         return 1
     fi
 
-    echo "🤖 Trying OpenRouter fallback (tngtech/deepseek-r1t2-chimera:free)..."
+    start_spinner "🤖 Trying OpenRouter fallback (tngtech/deepseek-r1t2-chimera:free)..."
     openrouter_payload=$(jq -n --arg content "$prompt_text" '{
         model: "tngtech/deepseek-r1t2-chimera:free",
         messages: [ { role: "user", content: $content } ]
@@ -155,6 +158,7 @@ try_openrouter_fallback() {
             -d "$openrouter_payload" \
             "https://openrouter.ai/api/v1/chat/completions"
     )
+    stop_spinner
 
     if echo "$openrouter_response" | jq -e '.error' >/dev/null; then
         echo "❌ OpenRouter error:"
@@ -234,9 +238,10 @@ if [[ "$existing_pr_count" -gt 0 ]]; then
 fi
 
 # --- Step 2: Get the code diff ---
-echo "🔄  Fetching latest changes and getting diff..."
+start_spinner "🔄  Fetching latest changes and getting diff"
 git fetch origin "${to_branch}" --quiet
 diff_output=$(git diff "origin/${to_branch}...${from_branch}")
+stop_spinner
 
 if [[ -z "$diff_output" ]]; then
     echo "⚠️  No differences found between '${from_branch}' and 'origin/${to_branch}'."
@@ -415,7 +420,6 @@ fi
 
 # --- Step 4 & 5: Send to Gemini API and output response ---
 echo "------------------------------"
-echo "🤖  Sending prompt, issues, and diff to Gemini. Please wait..."
 
 issues_text=""
 if [ ${#solved_issues[@]} -gt 0 ]; then
@@ -424,15 +428,15 @@ fi
 
 full_prompt_text=$(
     cat <<EOF
-${user_prompt}
+ ${user_prompt}
 
-${issues_text}
+ ${issues_text}
 
----
-Here is the code diff to analyze:
-\`\`\`diff
-${diff_output}
-\`\`\`
+ ---
+ Here is the code diff to analyze:
+ \`\`\`diff
+ ${diff_output}
+ \`\`\`
 EOF
 )
 
@@ -442,7 +446,7 @@ printf '%s' "$full_prompt_text" > "$tmpfile"
 
 json_payload=$(
     jq -n --rawfile text "$tmpfile" \
-        '{ 
+        '{
           contents: [ { parts: [ { text: $text } ] } ],
           generationConfig: { responseMimeType: "application/json" }
         }'
@@ -455,6 +459,7 @@ API_URL="https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flas
 payload_file=$(mktemp)
 printf '%s' "$json_payload" > "$payload_file"
 
+start_spinner "🤖  Sending prompt, issues, and diff to Gemini"
 fallback_generated_json=""
 api_response=$(
     curl -s \
@@ -463,6 +468,7 @@ api_response=$(
         -d @"$payload_file" \
         "$API_URL"
 )
+stop_spinner
 
 rm "$payload_file"
 
