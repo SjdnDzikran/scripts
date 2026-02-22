@@ -11,7 +11,24 @@ set -o pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/../lib/spinner.sh"
-trap 'stop_spinner >/dev/null 2>&1 || true' EXIT INT TERM
+
+cleanup_spinner() {
+    stop_spinner >/dev/null 2>&1 || true
+}
+
+handle_interrupt() {
+    cleanup_spinner
+    exit 130
+}
+
+handle_terminate() {
+    cleanup_spinner
+    exit 143
+}
+
+trap cleanup_spinner EXIT
+trap handle_interrupt INT
+trap handle_terminate TERM
 
 sync_to_base_branch() {
     local target_branch="$1"
