@@ -11,6 +11,9 @@ start_spinner() {
     local interval="${2:-0.08}"
     local i=0
     local -a spinner_frames
+    local spinner_color_start=""
+    local spinner_color_end=""
+    local spinner_color="${SPINNER_COLOR:-cyan}"
 
     # Stop any existing spinner before starting a new one.
     stop_spinner >/dev/null 2>&1 || true
@@ -30,12 +33,31 @@ start_spinner() {
         spinner_fd=1
     fi
 
+    # Colorize spinner frame for TTY output unless NO_COLOR is set.
+    if [[ -t "$spinner_fd" && -z "${NO_COLOR:-}" ]]; then
+        case "$spinner_color" in
+            red) spinner_color_start=$'\033[31m' ;;
+            green) spinner_color_start=$'\033[32m' ;;
+            yellow) spinner_color_start=$'\033[33m' ;;
+            blue) spinner_color_start=$'\033[34m' ;;
+            magenta) spinner_color_start=$'\033[35m' ;;
+            cyan) spinner_color_start=$'\033[36m' ;;
+            white) spinner_color_start=$'\033[37m' ;;
+            bold) spinner_color_start=$'\033[1m' ;;
+            none|off) spinner_color_start="" ;;
+            *) spinner_color_start=$'\033[36m' ;;
+        esac
+        if [[ -n "$spinner_color_start" ]]; then
+            spinner_color_end=$'\033[0m'
+        fi
+    fi
+
     tput civis 2>/dev/null || true
 
     (
         trap 'exit 0' TERM INT
         while true; do
-            printf "\r%s %s " "$message" "${spinner_frames[$((i % ${#spinner_frames[@]}))]}" >&"$spinner_fd"
+            printf "\r%s %s%s%s " "$message" "$spinner_color_start" "${spinner_frames[$((i % ${#spinner_frames[@]}))]}" "$spinner_color_end" >&"$spinner_fd"
             sleep "$interval"
             i=$((i+1))
         done
