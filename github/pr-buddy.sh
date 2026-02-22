@@ -74,7 +74,7 @@ merge_pr() {
     local merge_flag="$2"
     local to_branch="$3"
     local from_branch="$4"
-    local merge_output_file merge_output merge_status
+    local merge_output_file merge_output merge_status merge_output_lower auto_merge_queued
 
     if [[ -z "$pr_number" ]]; then
         echo "❌ Unable to determine PR number for merging."
@@ -86,27 +86,35 @@ merge_pr() {
     gh pr merge "$pr_number" "$merge_flag" --auto 2>&1 | tee /dev/tty | tee "$merge_output_file" >/dev/null
     merge_status=${PIPESTATUS[0]}
     merge_output=$(cat "$merge_output_file")
+    merge_output_lower=$(echo "$merge_output" | tr '[:upper:]' '[:lower:]')
     rm -f "$merge_output_file"
 
     # Fallback: if auto-merge is not allowed on the repo, try without it.
     if [[ $merge_status -ne 0 ]]; then
-        merge_output_lower=$(echo "$merge_output" | tr '[:upper:]' '[:lower:]')
         if [[ "$merge_output_lower" == *"auto merge"* || "$merge_output_lower" == *"automerge"* || "$merge_output_lower" == *"enablepullrequestautomerge"* ]]; then
             echo "ℹ️ Auto-merge not available. Retrying without --auto..."
             merge_output_file=$(mktemp)
             gh pr merge "$pr_number" "$merge_flag" 2>&1 | tee /dev/tty | tee "$merge_output_file" >/dev/null
             merge_status=${PIPESTATUS[0]}
             merge_output=$(cat "$merge_output_file")
+            merge_output_lower=$(echo "$merge_output" | tr '[:upper:]' '[:lower:]')
             rm -f "$merge_output_file"
         fi
     fi
 
     if [[ $merge_status -eq 0 ]]; then
-        if [[ "$merge_output" == *"queued"* || "$merge_output" == *"automatically"* ]]; then
-            echo "✅ Auto-merge enabled; PR will merge once requirements pass."
-        else
-            echo "✅ PR merged successfully."
+        auto_merge_queued=0
+        if [[ "$merge_output_lower" == *"queued"* || "$merge_output_lower" == *"automatically"* || "$merge_output_lower" == *"requirements pass"* || "$merge_output_lower" == *"once requirements"* ]]; then
+            auto_merge_queued=1
         fi
+
+        if [[ $auto_merge_queued -eq 1 ]]; then
+            echo "✅ Auto-merge enabled; PR will merge once requirements pass."
+            echo "ℹ️ Keeping branch '${from_branch}' until merge completes."
+            return 0
+        fi
+
+        echo "✅ PR merged successfully."
         sync_to_base_branch "$to_branch"
 
         echo "🗑️ Deleting merged branch '${from_branch}'..."
