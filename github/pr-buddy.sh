@@ -11,6 +11,7 @@ set -o pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/../lib/spinner.sh"
+trap 'stop_spinner >/dev/null 2>&1 || true' EXIT INT TERM
 
 sync_to_base_branch() {
     local target_branch="$1"
@@ -41,8 +42,13 @@ sync_to_base_branch() {
         return
     fi
 
-    if ! git pull --ff-only; then
+    start_spinner "⬇️ Pulling latest changes for ${target_branch}"
+    if ! git pull --ff-only >/dev/null 2>&1; then
+        stop_spinner
         echo "⚠️ git pull failed on ${target_branch}. Please check manually."
+    else
+        stop_spinner
+        echo "✅ ${target_branch} is up to date."
     fi
 }
 
@@ -181,7 +187,9 @@ echo "------------------------------"
 
 # --- Step 1: Get branch names from the user ---
 current_branch=$(git rev-parse --abbrev-ref HEAD)
+start_spinner "🌿 Detecting default branch from origin"
 default_branch=$(git remote show origin | awk '/HEAD branch/ {print $NF}')
+stop_spinner
 
 read -ep "Enter the source branch (from) [default: ${current_branch}]: " from_branch
 from_branch=${from_branch:-$current_branch}
@@ -192,7 +200,9 @@ to_branch=${to_branch:-$default_branch}
 echo "------------------------------"
 echo "➡️  Comparing branches: ${from_branch} -> ${to_branch}"
 
+start_spinner "🔎 Checking for existing open PRs"
 existing_pr_json=$(gh pr list --state open --head "$from_branch" --base "$to_branch" --json number,url -L 1 2>/dev/null || echo "[]")
+stop_spinner
 existing_pr_count=$(echo "$existing_pr_json" | jq 'length' 2>/dev/null || echo "0")
 if [[ "$existing_pr_count" -gt 0 ]]; then
     existing_pr_url=$(echo "$existing_pr_json" | jq -r '.[0].url // empty')
@@ -352,17 +362,18 @@ GitHub Issues to close with this PR:'
 user_prompt=${user_prompt:-$default_prompt}
 
 # --- Step 3.1: Fetch GitHub issues and let the user select ---
-echo "🔍 Fetching open issues from GitHub..."
 repo_url=$(git config --get remote.origin.url | sed -E 's#(git@|https://)github.com[:/](.*)\.git#\2#')
 issues_json="[]"
 issues_list=""
+start_spinner "🔍 Fetching open issues from GitHub"
 if command -v gh &>/dev/null; then
-    issues_json=$(gh issue list --limit 50 --json number,title,labels)
+    issues_json=$(gh issue list --limit 50 --json number,title,labels 2>/dev/null || echo "[]")
 else
     # Fallback to curl if gh is not available
     issues_json=$(curl -s -H "Accept: application/vnd.github.v3+json" \
-        "https://api.github.com/repos/${repo_url}/issues?state=open&per_page=50")
+        "https://api.github.com/repos/${repo_url}/issues?state=open&per_page=50" || echo "[]")
 fi
+stop_spinner
 
 if [[ -z "$issues_json" ]]; then
     issues_json="[]"
@@ -528,8 +539,15 @@ if [[ ! "${create_pr}" =~ ^[Nn]$ ]]; then
         echo "Please install the GitHub CLI: https://cli.github.com/"
         exit 1
     fi
+    start_spinner "👤 Resolving GitHub assignee"
+    if ! assignee=$(gh api user --jq '.login' 2>/dev/null); then
+        stop_spinner
+        echo "❌ Failed to resolve GitHub assignee."
+        exit 1
+    fi
+    stop_spinner
+
     echo "📤 Creating PR: \"$pr_title\"..."
-    assignee=$(gh api user --jq '.login')
     gh_pr_args=(
       --base "$to_branch"
       --head "$from_branch"
@@ -551,11 +569,14 @@ if [[ ! "${create_pr}" =~ ^[Nn]$ ]]; then
         echo "🏷️  Applying labels: ${label_display}"
     fi
 
-    pr_data=$(gh pr create "${gh_pr_args[@]}")
-    if [[ -z "$pr_data" ]]; then
+    start_spinner "📤 Creating GitHub PR"
+    if ! pr_data=$(gh pr create "${gh_pr_args[@]}" 2>&1); then
+        stop_spinner
         echo "❌ Failed to create PR."
+        echo "$pr_data"
         exit 1
     fi
+    stop_spinner
 
     pr_url=$(echo "$pr_data" | awk 'NF' | tail -n1)
     pr_number=""
