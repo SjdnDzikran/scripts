@@ -92,7 +92,7 @@ merge_pr() {
     if [[ $merge_status -ne 0 ]]; then
         merge_output_lower=$(echo "$merge_output" | tr '[:upper:]' '[:lower:]')
         if [[ "$merge_output_lower" == *"auto merge"* || "$merge_output_lower" == *"automerge"* || "$merge_output_lower" == *"enablepullrequestautomerge"* ]]; then
-            echo "ℹ️  Auto-merge not available. Retrying without --auto..."
+            echo "ℹ️ Auto-merge not available. Retrying without --auto..."
             merge_output_file=$(mktemp)
             gh pr merge "$pr_number" "$merge_flag" 2>&1 | tee /dev/tty | tee "$merge_output_file" >/dev/null
             merge_status=${PIPESTATUS[0]}
@@ -109,7 +109,7 @@ merge_pr() {
         fi
         sync_to_base_branch "$to_branch"
 
-        echo "🗑️  Deleting merged branch '${from_branch}'..."
+        echo "🗑️ Deleting merged branch '${from_branch}'..."
         if ! git branch -D "$from_branch" 2>/dev/null; then
             echo "❌ Failed to delete local branch '${from_branch}'."
             echo "Please handle deletion manually:"
@@ -224,11 +224,11 @@ existing_pr_count=$(echo "$existing_pr_json" | jq 'length' 2>/dev/null || echo "
 if [[ "$existing_pr_count" -gt 0 ]]; then
     existing_pr_url=$(echo "$existing_pr_json" | jq -r '.[0].url // empty')
     existing_pr_number=$(echo "$existing_pr_json" | jq -r '.[0].number // empty')
-    echo "⚠️  Found an open PR from ${from_branch} to ${to_branch}: ${existing_pr_url}"
+    echo "⚠️ Found an open PR from ${from_branch} to ${to_branch}: ${existing_pr_url}"
     if [[ -n "$existing_pr_number" ]]; then
         read -ep "Do you want to update PR #${existing_pr_number}? (Y/n): " update_existing_pr
         if [[ ! "$update_existing_pr" =~ ^[Nn]$ ]]; then
-            echo "ℹ️  Continuing with PR creation flow to update the existing PR context."
+            echo "ℹ️ Continuing with PR creation flow to update the existing PR context."
         else
             read -ep "Do you want to merge PR #${existing_pr_number} now? (Y/n): " merge_existing
             if [[ ! "$merge_existing" =~ ^[Nn]$ ]]; then
@@ -247,7 +247,7 @@ if [[ "$existing_pr_count" -gt 0 ]]; then
                         merge_flag_existing="--squash"
                         ;;
                     *)
-                        echo "⚠️  Unknown option '${merge_choice_existing}'. Using squash merge."
+                        echo "⚠️ Unknown option '${merge_choice_existing}'. Using squash merge."
                         merge_flag_existing="--squash"
                         ;;
                 esac
@@ -256,27 +256,27 @@ if [[ "$existing_pr_count" -gt 0 ]]; then
                 echo "✅ Done."
                 exit 0
             else
-                echo "ℹ️  Skipping merge of existing PR."
+                echo "ℹ️ Skipping merge of existing PR."
             fi
         fi
     else
-        echo "⚠️  Could not determine PR number. Skipping merge prompt."
+        echo "⚠️ Could not determine PR number. Skipping merge prompt."
     fi
 fi
 
 # --- Step 2: Get the code diff ---
-start_spinner "🔄  Fetching latest changes and getting diff"
+start_spinner "🔄 Fetching latest changes and getting diff"
 git fetch origin "${to_branch}" --quiet
 diff_output=$(git diff "origin/${to_branch}...${from_branch}")
 stop_spinner
 
 if [[ -z "$diff_output" ]]; then
-    echo "⚠️  No differences found between '${from_branch}' and 'origin/${to_branch}'."
+    echo "⚠️ No differences found between '${from_branch}' and 'origin/${to_branch}'."
     echo "There is nothing to create a PR for. Exiting."
     exit 0
 fi
 
-echo "✅  Found code differences."
+echo "✅ Found code differences."
 echo "------------------------------"
 
 # --- Step 3: Get the user's prompt and solved issues ---
@@ -402,9 +402,9 @@ solved_issues=()
 declare -a pr_labels=()
 declare -A label_seen=()
 if [[ -z "$issues_list" ]]; then
-    echo "⚠️  No open issues found."
+    echo "⚠️ No open issues found."
 else
-    echo "✅  Select related issues (space to toggle, enter to confirm, esc to skip):"
+    echo "✅ Select related issues (space to toggle, enter to confirm, esc to skip):"
     selected=$(
         echo "$issues_list" | fzf \
             --multi \
@@ -487,7 +487,7 @@ API_URL="https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flas
 payload_file=$(mktemp)
 printf '%s' "$json_payload" > "$payload_file"
 
-start_spinner "🤖  Sending prompt, issues, and diff to Gemini"
+start_spinner "🤖 Sending prompt, issues, and diff to Gemini"
 fallback_generated_json=""
 api_response=$(
     curl -s \
@@ -583,7 +583,7 @@ if [[ ! "${create_pr}" =~ ^[Nn]$ ]]; then
             fi
             gh_pr_args+=(--label "$label")
         done
-        echo "🏷️  Applying labels: ${label_display}"
+        echo "🏷️ Applying labels: ${label_display}"
     fi
 
     start_spinner "📤 Creating GitHub PR"
@@ -624,7 +624,7 @@ if [[ ! "${create_pr}" =~ ^[Nn]$ ]]; then
                 merge_flag="--squash"
                 ;;
             *)
-                echo "⚠️  Unknown option '${merge_choice}'. Using squash merge."
+                echo "⚠️ Unknown option '${merge_choice}'. Using squash merge."
                 merge_flag="--squash"
                 ;;
         esac
