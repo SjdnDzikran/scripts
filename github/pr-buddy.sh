@@ -9,6 +9,27 @@ set -e
 set -u
 set -o pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "${SCRIPT_DIR}/../lib/spinner.sh"
+
+cleanup_spinner() {
+    stop_spinner >/dev/null 2>&1 || true
+}
+
+handle_interrupt() {
+    cleanup_spinner
+    exit 130
+}
+
+handle_terminate() {
+    cleanup_spinner
+    exit 143
+}
+
+trap cleanup_spinner EXIT
+trap handle_interrupt INT
+trap handle_terminate TERM
+
 sync_to_base_branch() {
     local target_branch="$1"
     local repo_path
@@ -38,8 +59,13 @@ sync_to_base_branch() {
         return
     fi
 
-    if ! git pull --ff-only; then
+    start_spinner "⬇️ Pulling latest changes for ${target_branch}"
+    if ! git pull --ff-only >/dev/null 2>&1; then
+        stop_spinner
         echo "⚠️ git pull failed on ${target_branch}. Please check manually."
+    else
+        stop_spinner
+        echo "✅ ${target_branch} is up to date."
     fi
 }
 
@@ -48,7 +74,7 @@ merge_pr() {
     local merge_flag="$2"
     local to_branch="$3"
     local from_branch="$4"
-    local merge_output_file merge_output merge_status
+    local merge_output_file merge_output merge_status merge_output_lower auto_merge_queued
 
     if [[ -z "$pr_number" ]]; then
         echo "❌ Unable to determine PR number for merging."
@@ -60,30 +86,38 @@ merge_pr() {
     gh pr merge "$pr_number" "$merge_flag" --auto 2>&1 | tee /dev/tty | tee "$merge_output_file" >/dev/null
     merge_status=${PIPESTATUS[0]}
     merge_output=$(cat "$merge_output_file")
+    merge_output_lower=$(echo "$merge_output" | tr '[:upper:]' '[:lower:]')
     rm -f "$merge_output_file"
 
     # Fallback: if auto-merge is not allowed on the repo, try without it.
     if [[ $merge_status -ne 0 ]]; then
-        merge_output_lower=$(echo "$merge_output" | tr '[:upper:]' '[:lower:]')
         if [[ "$merge_output_lower" == *"auto merge"* || "$merge_output_lower" == *"automerge"* || "$merge_output_lower" == *"enablepullrequestautomerge"* ]]; then
-            echo "ℹ️  Auto-merge not available. Retrying without --auto..."
+            echo "ℹ️ Auto-merge not available. Retrying without --auto..."
             merge_output_file=$(mktemp)
             gh pr merge "$pr_number" "$merge_flag" 2>&1 | tee /dev/tty | tee "$merge_output_file" >/dev/null
             merge_status=${PIPESTATUS[0]}
             merge_output=$(cat "$merge_output_file")
+            merge_output_lower=$(echo "$merge_output" | tr '[:upper:]' '[:lower:]')
             rm -f "$merge_output_file"
         fi
     fi
 
     if [[ $merge_status -eq 0 ]]; then
-        if [[ "$merge_output" == *"queued"* || "$merge_output" == *"automatically"* ]]; then
-            echo "✅ Auto-merge enabled; PR will merge once requirements pass."
-        else
-            echo "✅ PR merged successfully."
+        auto_merge_queued=0
+        if [[ "$merge_output_lower" == *"queued"* || "$merge_output_lower" == *"automatically"* || "$merge_output_lower" == *"requirements pass"* || "$merge_output_lower" == *"once requirements"* ]]; then
+            auto_merge_queued=1
         fi
+
+        if [[ $auto_merge_queued -eq 1 ]]; then
+            echo "✅ Auto-merge enabled; PR will merge once requirements pass."
+            echo "ℹ️ Keeping branch '${from_branch}' until merge completes."
+            return 0
+        fi
+
+        echo "✅ PR merged successfully."
         sync_to_base_branch "$to_branch"
 
-        echo "🗑️  Deleting merged branch '${from_branch}'..."
+        echo "🗑️ Deleting merged branch '${from_branch}'..."
         if ! git branch -D "$from_branch" 2>/dev/null; then
             echo "❌ Failed to delete local branch '${from_branch}'."
             echo "Please handle deletion manually:"
@@ -142,7 +176,7 @@ try_openrouter_fallback() {
         return 1
     fi
 
-    echo "🤖 Trying OpenRouter fallback (tngtech/deepseek-r1t2-chimera:free)..."
+    start_spinner "🤖 Trying OpenRouter fallback (tngtech/deepseek-r1t2-chimera:free)..."
     openrouter_payload=$(jq -n --arg content "$prompt_text" '{
         model: "tngtech/deepseek-r1t2-chimera:free",
         messages: [ { role: "user", content: $content } ]
@@ -155,6 +189,7 @@ try_openrouter_fallback() {
             -d "$openrouter_payload" \
             "https://openrouter.ai/api/v1/chat/completions"
     )
+    stop_spinner
 
     if echo "$openrouter_response" | jq -e '.error' >/dev/null; then
         echo "❌ OpenRouter error:"
@@ -177,7 +212,9 @@ echo "------------------------------"
 
 # --- Step 1: Get branch names from the user ---
 current_branch=$(git rev-parse --abbrev-ref HEAD)
+start_spinner "🌿 Detecting default branch from origin"
 default_branch=$(git remote show origin | awk '/HEAD branch/ {print $NF}')
+stop_spinner
 
 read -ep "Enter the source branch (from) [default: ${current_branch}]: " from_branch
 from_branch=${from_branch:-$current_branch}
@@ -188,16 +225,18 @@ to_branch=${to_branch:-$default_branch}
 echo "------------------------------"
 echo "➡️  Comparing branches: ${from_branch} -> ${to_branch}"
 
+start_spinner "🔎 Checking for existing open PRs"
 existing_pr_json=$(gh pr list --state open --head "$from_branch" --base "$to_branch" --json number,url -L 1 2>/dev/null || echo "[]")
+stop_spinner
 existing_pr_count=$(echo "$existing_pr_json" | jq 'length' 2>/dev/null || echo "0")
 if [[ "$existing_pr_count" -gt 0 ]]; then
     existing_pr_url=$(echo "$existing_pr_json" | jq -r '.[0].url // empty')
     existing_pr_number=$(echo "$existing_pr_json" | jq -r '.[0].number // empty')
-    echo "⚠️  Found an open PR from ${from_branch} to ${to_branch}: ${existing_pr_url}"
+    echo "⚠️ Found an open PR from ${from_branch} to ${to_branch}: ${existing_pr_url}"
     if [[ -n "$existing_pr_number" ]]; then
         read -ep "Do you want to update PR #${existing_pr_number}? (Y/n): " update_existing_pr
         if [[ ! "$update_existing_pr" =~ ^[Nn]$ ]]; then
-            echo "ℹ️  Continuing with PR creation flow to update the existing PR context."
+            echo "ℹ️ Continuing with PR creation flow to update the existing PR context."
         else
             read -ep "Do you want to merge PR #${existing_pr_number} now? (Y/n): " merge_existing
             if [[ ! "$merge_existing" =~ ^[Nn]$ ]]; then
@@ -216,7 +255,7 @@ if [[ "$existing_pr_count" -gt 0 ]]; then
                         merge_flag_existing="--squash"
                         ;;
                     *)
-                        echo "⚠️  Unknown option '${merge_choice_existing}'. Using squash merge."
+                        echo "⚠️ Unknown option '${merge_choice_existing}'. Using squash merge."
                         merge_flag_existing="--squash"
                         ;;
                 esac
@@ -225,26 +264,27 @@ if [[ "$existing_pr_count" -gt 0 ]]; then
                 echo "✅ Done."
                 exit 0
             else
-                echo "ℹ️  Skipping merge of existing PR."
+                echo "ℹ️ Skipping merge of existing PR."
             fi
         fi
     else
-        echo "⚠️  Could not determine PR number. Skipping merge prompt."
+        echo "⚠️ Could not determine PR number. Skipping merge prompt."
     fi
 fi
 
 # --- Step 2: Get the code diff ---
-echo "🔄  Fetching latest changes and getting diff..."
+start_spinner "🔄 Fetching latest changes and getting diff"
 git fetch origin "${to_branch}" --quiet
 diff_output=$(git diff "origin/${to_branch}...${from_branch}")
+stop_spinner
 
 if [[ -z "$diff_output" ]]; then
-    echo "⚠️  No differences found between '${from_branch}' and 'origin/${to_branch}'."
+    echo "⚠️ No differences found between '${from_branch}' and 'origin/${to_branch}'."
     echo "There is nothing to create a PR for. Exiting."
     exit 0
 fi
 
-echo "✅  Found code differences."
+echo "✅ Found code differences."
 echo "------------------------------"
 
 # --- Step 3: Get the user's prompt and solved issues ---
@@ -347,17 +387,18 @@ GitHub Issues to close with this PR:'
 user_prompt=${user_prompt:-$default_prompt}
 
 # --- Step 3.1: Fetch GitHub issues and let the user select ---
-echo "🔍 Fetching open issues from GitHub..."
 repo_url=$(git config --get remote.origin.url | sed -E 's#(git@|https://)github.com[:/](.*)\.git#\2#')
 issues_json="[]"
 issues_list=""
+start_spinner "🔍 Fetching open issues from GitHub"
 if command -v gh &>/dev/null; then
-    issues_json=$(gh issue list --limit 50 --json number,title,labels)
+    issues_json=$(gh issue list --limit 50 --json number,title,labels 2>/dev/null || echo "[]")
 else
     # Fallback to curl if gh is not available
     issues_json=$(curl -s -H "Accept: application/vnd.github.v3+json" \
-        "https://api.github.com/repos/${repo_url}/issues?state=open&per_page=50")
+        "https://api.github.com/repos/${repo_url}/issues?state=open&per_page=50" || echo "[]")
 fi
+stop_spinner
 
 if [[ -z "$issues_json" ]]; then
     issues_json="[]"
@@ -369,9 +410,9 @@ solved_issues=()
 declare -a pr_labels=()
 declare -A label_seen=()
 if [[ -z "$issues_list" ]]; then
-    echo "⚠️  No open issues found."
+    echo "⚠️ No open issues found."
 else
-    echo "✅  Select related issues (space to toggle, enter to confirm, esc to skip):"
+    echo "✅ Select related issues (space to toggle, enter to confirm, esc to skip):"
     selected=$(
         echo "$issues_list" | fzf \
             --multi \
@@ -415,7 +456,6 @@ fi
 
 # --- Step 4 & 5: Send to Gemini API and output response ---
 echo "------------------------------"
-echo "🤖  Sending prompt, issues, and diff to Gemini. Please wait..."
 
 issues_text=""
 if [ ${#solved_issues[@]} -gt 0 ]; then
@@ -424,15 +464,15 @@ fi
 
 full_prompt_text=$(
     cat <<EOF
-${user_prompt}
+ ${user_prompt}
 
-${issues_text}
+ ${issues_text}
 
----
-Here is the code diff to analyze:
-\`\`\`diff
-${diff_output}
-\`\`\`
+ ---
+ Here is the code diff to analyze:
+ \`\`\`diff
+ ${diff_output}
+ \`\`\`
 EOF
 )
 
@@ -442,7 +482,7 @@ printf '%s' "$full_prompt_text" > "$tmpfile"
 
 json_payload=$(
     jq -n --rawfile text "$tmpfile" \
-        '{ 
+        '{
           contents: [ { parts: [ { text: $text } ] } ],
           generationConfig: { responseMimeType: "application/json" }
         }'
@@ -455,6 +495,7 @@ API_URL="https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flas
 payload_file=$(mktemp)
 printf '%s' "$json_payload" > "$payload_file"
 
+start_spinner "🤖 Sending prompt, issues, and diff to Gemini"
 fallback_generated_json=""
 api_response=$(
     curl -s \
@@ -463,6 +504,7 @@ api_response=$(
         -d @"$payload_file" \
         "$API_URL"
 )
+stop_spinner
 
 rm "$payload_file"
 
@@ -522,8 +564,15 @@ if [[ ! "${create_pr}" =~ ^[Nn]$ ]]; then
         echo "Please install the GitHub CLI: https://cli.github.com/"
         exit 1
     fi
+    start_spinner "👤 Resolving GitHub assignee"
+    if ! assignee=$(gh api user --jq '.login' 2>/dev/null); then
+        stop_spinner
+        echo "❌ Failed to resolve GitHub assignee."
+        exit 1
+    fi
+    stop_spinner
+
     echo "📤 Creating PR: \"$pr_title\"..."
-    assignee=$(gh api user --jq '.login')
     gh_pr_args=(
       --base "$to_branch"
       --head "$from_branch"
@@ -542,14 +591,17 @@ if [[ ! "${create_pr}" =~ ^[Nn]$ ]]; then
             fi
             gh_pr_args+=(--label "$label")
         done
-        echo "🏷️  Applying labels: ${label_display}"
+        echo "🏷️ Applying labels: ${label_display}"
     fi
 
-    pr_data=$(gh pr create "${gh_pr_args[@]}")
-    if [[ -z "$pr_data" ]]; then
+    start_spinner "📤 Creating GitHub PR"
+    if ! pr_data=$(gh pr create "${gh_pr_args[@]}" 2>&1); then
+        stop_spinner
         echo "❌ Failed to create PR."
+        echo "$pr_data"
         exit 1
     fi
+    stop_spinner
 
     pr_url=$(echo "$pr_data" | awk 'NF' | tail -n1)
     pr_number=""
@@ -580,7 +632,7 @@ if [[ ! "${create_pr}" =~ ^[Nn]$ ]]; then
                 merge_flag="--squash"
                 ;;
             *)
-                echo "⚠️  Unknown option '${merge_choice}'. Using squash merge."
+                echo "⚠️ Unknown option '${merge_choice}'. Using squash merge."
                 merge_flag="--squash"
                 ;;
         esac
