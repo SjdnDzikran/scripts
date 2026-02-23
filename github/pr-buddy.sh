@@ -209,6 +209,7 @@ try_openrouter_fallback() {
 
 echo "✅ Pre-flight checks passed."
 echo "------------------------------"
+echo
 
 # --- Step 1: Get branch names from the user ---
 current_branch=$(git rev-parse --abbrev-ref HEAD)
@@ -273,6 +274,7 @@ if [[ "$existing_pr_count" -gt 0 ]]; then
 fi
 
 # --- Step 2: Get the code diff ---
+echo
 start_spinner "🔄 Fetching latest changes and getting diff"
 git fetch origin "${to_branch}" --quiet
 diff_output=$(git diff "origin/${to_branch}...${from_branch}")
@@ -286,6 +288,7 @@ fi
 
 echo "✅ Found code differences."
 echo "------------------------------"
+echo
 
 # --- Step 3: Get the user's prompt and solved issues ---
 
@@ -455,6 +458,7 @@ fi
 
 
 # --- Step 4 & 5: Send to Gemini API and output response ---
+echo
 echo "------------------------------"
 
 issues_text=""
@@ -557,6 +561,7 @@ echo -e "\n---------------------------"
 
 
 # --- Step 6: Automatically create PR (optional) ---
+echo
 read -ep "Do you want to create a GitHub PR with this? (Y/n): " create_pr
 if [[ ! "${create_pr}" =~ ^[Nn]$ ]]; then
     if ! command -v gh &>/dev/null; then
