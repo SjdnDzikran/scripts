@@ -117,7 +117,7 @@ merge_pr() {
         echo "✅ PR merged successfully."
         sync_to_base_branch "$to_branch"
 
-        echo "🗑️ Deleting merged branch '${from_branch}'..."
+        echo "🗑️  Deleting merged branch '${from_branch}'..."
         if ! git branch -D "$from_branch" 2>/dev/null; then
             echo "❌ Failed to delete local branch '${from_branch}'."
             echo "Please handle deletion manually:"
@@ -591,7 +591,7 @@ if [[ ! "${create_pr}" =~ ^[Nn]$ ]]; then
             fi
             gh_pr_args+=(--label "$label")
         done
-        echo "🏷️ Applying labels: ${label_display}"
+        echo "🏷️  Applying labels: ${label_display}"
     fi
 
     start_spinner "📤 Creating GitHub PR"
