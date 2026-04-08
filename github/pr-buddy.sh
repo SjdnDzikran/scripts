@@ -117,7 +117,7 @@ merge_pr() {
         echo "✅ PR merged successfully."
         sync_to_base_branch "$to_branch"
 
-        echo "🗑️ Deleting merged branch '${from_branch}'..."
+        echo "🗑️  Deleting merged branch '${from_branch}'..."
         if ! git branch -D "$from_branch" 2>/dev/null; then
             echo "❌ Failed to delete local branch '${from_branch}'."
             echo "Please handle deletion manually:"
@@ -176,9 +176,9 @@ try_openrouter_fallback() {
         return 1
     fi
 
-    start_spinner "🤖 Trying OpenRouter fallback (tngtech/deepseek-r1t2-chimera:free)..."
+    start_spinner "🤖 Trying OpenRouter fallback (minimax/minimax-m2.5:free)..."
     openrouter_payload=$(jq -n --arg content "$prompt_text" '{
-        model: "tngtech/deepseek-r1t2-chimera:free",
+        model: "minimax/minimax-m2.5:free",
         messages: [ { role: "user", content: $content } ]
     }')
 
@@ -209,6 +209,7 @@ try_openrouter_fallback() {
 
 echo "✅ Pre-flight checks passed."
 echo "------------------------------"
+echo
 
 # --- Step 1: Get branch names from the user ---
 current_branch=$(git rev-parse --abbrev-ref HEAD)
@@ -273,6 +274,7 @@ if [[ "$existing_pr_count" -gt 0 ]]; then
 fi
 
 # --- Step 2: Get the code diff ---
+echo
 start_spinner "🔄 Fetching latest changes and getting diff"
 git fetch origin "${to_branch}" --quiet
 diff_output=$(git diff "origin/${to_branch}...${from_branch}")
@@ -286,6 +288,7 @@ fi
 
 echo "✅ Found code differences."
 echo "------------------------------"
+echo
 
 # --- Step 3: Get the user's prompt and solved issues ---
 
@@ -454,7 +457,8 @@ else
 fi
 
 
-# --- Step 4 & 5: Send to Gemini API and output response ---
+# --- Step 4 and 5: Send to Gemini API and output response ---
+echo
 echo "------------------------------"
 
 issues_text=""
@@ -557,6 +561,7 @@ echo -e "\n---------------------------"
 
 
 # --- Step 6: Automatically create PR (optional) ---
+echo
 read -ep "Do you want to create a GitHub PR with this? (Y/n): " create_pr
 if [[ ! "${create_pr}" =~ ^[Nn]$ ]]; then
     if ! command -v gh &>/dev/null; then
@@ -591,7 +596,7 @@ if [[ ! "${create_pr}" =~ ^[Nn]$ ]]; then
             fi
             gh_pr_args+=(--label "$label")
         done
-        echo "🏷️ Applying labels: ${label_display}"
+        echo "🏷️  Applying labels: ${label_display}"
     fi
 
     start_spinner "📤 Creating GitHub PR"
