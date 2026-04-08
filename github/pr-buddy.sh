@@ -176,9 +176,9 @@ try_openrouter_fallback() {
         return 1
     fi
 
-    start_spinner "🤖 Trying OpenRouter fallback (stepfun/step-3.5-flash:free)..."
+    start_spinner "🤖 Trying OpenRouter fallback (minimax/minimax-m2.5:free)..."
     openrouter_payload=$(jq -n --arg content "$prompt_text" '{
-        model: "stepfun/step-3.5-flash:free",
+        model: "minimax/minimax-m2.5:free",
         messages: [ { role: "user", content: $content } ]
     }')
 
