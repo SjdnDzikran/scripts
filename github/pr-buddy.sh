@@ -176,9 +176,9 @@ try_openrouter_fallback() {
         return 1
     fi
 
-    start_spinner "🤖 Trying OpenRouter fallback (tngtech/deepseek-r1t2-chimera:free)..."
+    start_spinner "🤖 Trying OpenRouter fallback (stepfun/step-3.5-flash:free)..."
     openrouter_payload=$(jq -n --arg content "$prompt_text" '{
-        model: "tngtech/deepseek-r1t2-chimera:free",
+        model: "stepfun/step-3.5-flash:free",
         messages: [ { role: "user", content: $content } ]
     }')
 
@@ -457,7 +457,7 @@ else
 fi
 
 
-# --- Step 4 & 5: Send to Gemini API and output response ---
+# --- Step 4 and 5: Send to Gemini API and output response ---
 echo
 echo "------------------------------"
 
