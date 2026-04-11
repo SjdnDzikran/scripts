@@ -69,6 +69,11 @@ case "$bump_choice" in
         ;;
 esac
 
+# Bumping the build number too if it exists.
+if [[ -n "$build_number" ]]; then
+    ((build_number+=1))
+fi
+
 new_version="${major}.${minor}.${patch}"
 if [[ -n "$build_number" ]]; then
     new_version+="+${build_number}"
