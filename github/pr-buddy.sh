@@ -226,6 +226,9 @@ to_branch=${to_branch:-$default_branch}
 echo "------------------------------"
 echo "➡️  Comparing branches: ${from_branch} -> ${to_branch}"
 
+is_update="false"
+existing_pr_number=""
+
 start_spinner "🔎 Checking for existing open PRs"
 existing_pr_json=$(gh pr list --state open --head "$from_branch" --base "$to_branch" --json number,url -L 1 2>/dev/null || echo "[]")
 stop_spinner
@@ -238,6 +241,7 @@ if [[ "$existing_pr_count" -gt 0 ]]; then
         read -ep "Do you want to update PR #${existing_pr_number}? (Y/n): " update_existing_pr
         if [[ ! "$update_existing_pr" =~ ^[Nn]$ ]]; then
             echo "ℹ️ Continuing with PR creation flow to update the existing PR context."
+            is_update="true"
         else
             read -ep "Do you want to merge PR #${existing_pr_number} now? (Y/n): " merge_existing
             if [[ ! "$merge_existing" =~ ^[Nn]$ ]]; then
@@ -599,25 +603,37 @@ if [[ ! "${create_pr}" =~ ^[Nn]$ ]]; then
         echo "🏷️  Applying labels: ${label_display}"
     fi
 
-    start_spinner "📤 Creating GitHub PR"
-    if ! pr_data=$(gh pr create "${gh_pr_args[@]}" 2>&1); then
+    if [[ "$is_update" == "true" && -n "$existing_pr_number" ]]; then
+        start_spinner "📤 Updating GitHub PR #${existing_pr_number}"
+        if ! pr_data=$(gh pr edit "$existing_pr_number" "${gh_pr_args[@]}" 2>&1); then
+            stop_spinner
+            echo "❌ Failed to update PR."
+            echo "$pr_data"
+            exit 1
+        fi
         stop_spinner
-        echo "❌ Failed to create PR."
-        echo "$pr_data"
-        exit 1
-    fi
-    stop_spinner
+        pr_number="$existing_pr_number"
+        pr_url=$(echo "$pr_data" | awk 'NF' | tail -n1)
+    else
+        start_spinner "📤 Creating GitHub PR"
+        if ! pr_data=$(gh pr create "${gh_pr_args[@]}" 2>&1); then
+            stop_spinner
+            echo "❌ Failed to create PR."
+            echo "$pr_data"
+            exit 1
+        fi
+        stop_spinner
 
-    pr_url=$(echo "$pr_data" | awk 'NF' | tail -n1)
-    pr_number=""
-    if [[ "$pr_url" =~ /pull/([0-9]+) ]]; then
-        pr_number="${BASH_REMATCH[1]}"
+        pr_url=$(echo "$pr_data" | awk 'NF' | tail -n1)
+        if [[ "$pr_url" =~ /pull/([0-9]+) ]]; then
+            pr_number="${BASH_REMATCH[1]}"
+        fi
     fi
 
     if [[ -n "$pr_url" ]]; then
-        echo "✅ PR created: ${pr_url}"
+        echo "✅ PR $( [[ "$is_update" == "true" ]] && echo "updated" || echo "created" ): ${pr_url}"
     else
-        echo "✅ PR created."
+        echo "✅ PR $( [[ "$is_update" == "true" ]] && echo "updated" || echo "created" )."
     fi
 
     read -ep "Do you want to merge this PR now? (Y/n): " merge_now
